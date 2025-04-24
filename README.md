@@ -11,7 +11,13 @@ are stored in the `./02_analysis`-folder.
 
 `./01_build/init_db_accidents.sh`
 
-#### 2) Download Data and import into databases
+#### 2) Download Data and import into Databases
 `./01_build/build_rides_data.py`
 
 `./01_build/build_accident_data.py`
+
+#### 3) Analyses
+`./02_analysis/01_descriptice_statistics_ride.py`
+
+
+### Code Sources
