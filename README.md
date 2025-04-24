@@ -1,1 +1,17 @@
-# city_bikes
+# Manual
+Additional notes on the code used to solve the tasks in the Data Science challenge. 
+Data transformation files are stored in the `./01_build`-folder while the analyses files
+are stored in the `./02_analysis`-folder.
+
+
+### Instructions
+
+#### 1) Initialize Databases
+`./01_build/init_db_rides.sh`
+
+`./01_build/init_db_accidents.sh`
+
+#### 2) Download Data and import into databases
+`./01_build/build_rides_data.py`
+
+`./01_build/build_accident_data.py`
