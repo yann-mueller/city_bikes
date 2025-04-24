@@ -20,4 +20,8 @@ are stored in the `./02_analysis`-folder.
 `./02_analysis/01_descriptice_statistics_ride.py`
 
 
-### Code Sources
+### Data Sources
+
+Ride Data: [CitiBike](https://s3.amazonaws.com/tripdata/index.html)
+
+Accident Data: [NYPD](https://data.cityofnewyork.us/Public-Safety/Motor-Vehicle-Collisions-Crashes/h9gi-nx95/data_preview)
