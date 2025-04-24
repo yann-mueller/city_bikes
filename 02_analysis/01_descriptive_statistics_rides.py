@@ -56,9 +56,9 @@ df['num_rides_millions'] = df['num_rides'] / 1_000_000
 plt.figure(figsize=(10, 5))
 plt.bar(df['month_label'], df['num_rides_millions'], color="#1f77b4")
 
-plt.xlabel("Month", fontsize=16)
-plt.ylabel("Number of Rides (Millions)", fontsize=16, labelpad=15)
-plt.title("Monthly CitiBike Rides – 2024", fontsize=18)
+plt.xlabel("Monat", fontsize=16)
+plt.ylabel("Anzahl Fahrten (in Millionen)", fontsize=16, labelpad=15)
+plt.title("Monatliche CitiBike Fahrten – 2024", fontsize=18)
 
 plt.xticks(fontsize=14)
 plt.yticks(fontsize=14)
