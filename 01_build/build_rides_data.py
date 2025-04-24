@@ -5,7 +5,7 @@ import requests
 import zipfile
 import pandas as pd
 import shutil
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 #%%
 
 # Configuration
@@ -103,4 +103,25 @@ for ZIP_URL in ZIP_URLS:
 
 print("\n🎉 All files processed successfully.")
 
+#%% Remove potential duplicate observations
+with engine.begin() as conn:
+    print("Removing duplicates from 'trips' based on ride_id...")
 
+    # Create a deduplicated version of the table
+    conn.execute(text("""
+        CREATE TABLE trips_clean AS
+        SELECT DISTINCT ON (ride_id) *
+        FROM trips
+        ORDER BY ride_id, started_at;
+    """))
+
+    # Drop the original 'trips' table
+    conn.execute(text("DROP TABLE trips;"))
+
+    # Rename the cleaned table back to 'trips'
+    conn.execute(text("ALTER TABLE trips_clean RENAME TO trips;"))
+
+    # Re-create index to improve performance
+    conn.execute(text("CREATE INDEX idx_ride_id ON trips(ride_id);"))
+
+    print("Duplications removed and table updated.")
