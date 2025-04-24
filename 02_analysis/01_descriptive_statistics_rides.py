@@ -6,6 +6,24 @@ engine = create_engine("postgresql://postgres:axa_datascience@localhost:5432/cit
 
 
 #%%
+# Query the schema for the 'trips' table
+query = """
+SELECT 
+    column_name, 
+    data_type 
+FROM 
+    information_schema.columns 
+WHERE 
+    table_name = 'trips'
+ORDER BY 
+    ordinal_position;
+"""
+
+df = pd.read_sql(query, engine)
+print(df)
+
+
+#%%
 df = pd.read_sql("SELECT COUNT(*) AS total_rows FROM trips", con=engine)
 print(df)
 
