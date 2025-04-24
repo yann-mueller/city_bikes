@@ -9,8 +9,7 @@ from sqlalchemy import create_engine
 engine = create_engine("postgresql://postgres:axa_datascience@localhost:5432/citibike")
 
 
-#%%
-# Query the schema for the 'trips' table
+#%% Column type information
 query = """
 SELECT 
     column_name, 
@@ -23,16 +22,20 @@ ORDER BY
     ordinal_position;
 """
 
-df = pd.read_sql(query, engine)
+temp = pd.read_sql(query, engine)
+print(temp)
+
+#%% Number of unique stations
+df = pd.read_sql("SELECT COUNT(DISTINCT start_station_id) AS unique_start_stations FROM trips", con=engine)
 print(df)
 
 
 
 #%%
-df = pd.read_sql("SELECT COUNT(*) AS total_rows FROM trips", con=engine)
-print(df)
+temp = pd.read_sql("SELECT COUNT(*) AS total_rows FROM trips", con=engine)
+print(temp)
 
-#%%
+#%% Rides per Month
 query = """
 SELECT 
     DATE_TRUNC('month', started_at::timestamp) AS month,
@@ -45,7 +48,7 @@ ORDER BY month;
 
 df = pd.read_sql(query, engine)
 print(df)
-#%%
+#%% Plot: Rides per Month
 df['month_label'] = df['month'].dt.strftime('%B')  # e.g., "January"
 df['num_rides_millions'] = df['num_rides'] / 1_000_000
 
