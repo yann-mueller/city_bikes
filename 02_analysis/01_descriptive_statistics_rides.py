@@ -1,3 +1,7 @@
+import matplotlib
+matplotlib.use('TkAgg')  # or 'QtAgg' if you have PyQt installed
+
+import matplotlib.pyplot as plt
 import pandas as pd
 from sqlalchemy import create_engine
 
@@ -23,9 +27,43 @@ df = pd.read_sql(query, engine)
 print(df)
 
 
+
 #%%
 df = pd.read_sql("SELECT COUNT(*) AS total_rows FROM trips", con=engine)
 print(df)
+
+#%%
+query = """
+SELECT 
+    DATE_TRUNC('month', started_at::timestamp) AS month,
+    COUNT(*) AS num_rides
+FROM trips
+WHERE DATE_PART('year', started_at::timestamp) = 2024
+GROUP BY month
+ORDER BY month;
+"""
+
+df = pd.read_sql(query, engine)
+print(df)
+#%%
+df['month_label'] = df['month'].dt.strftime('%B')  # e.g., "January"
+df['num_rides_millions'] = df['num_rides'] / 1_000_000
+
+# Plot
+plt.figure(figsize=(10, 5))
+plt.bar(df['month_label'], df['num_rides_millions'], color="#1f77b4")
+
+plt.xlabel("Month", fontsize=16)
+plt.ylabel("Number of Rides (Millions)", fontsize=16, labelpad=15)
+plt.title("Monthly CitiBike Rides – 2024", fontsize=18)
+
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+
+plt.tight_layout()
+
+# Save
+plt.savefig("02_analysis/plots/monthly_rides_2024.png")
 
 
 #%%
