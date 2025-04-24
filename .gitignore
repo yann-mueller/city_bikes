@@ -1,0 +1,18 @@
+# Ignore data folders and large files
+99_temp/
+*.csv
+*.zip
+*.parquet
+
+# Ignore Python artifacts
+__pycache__/
+*.py[cod]
+
+# Ignore virtual environments
+.venv/
+
+# Ignore IDE config (PyCharm)
+.idea/
+
+# Ignore Jupyter notebook checkpoints
+.ipynb_checkpoints/
