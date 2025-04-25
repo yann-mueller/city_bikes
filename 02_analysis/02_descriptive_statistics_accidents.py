@@ -46,3 +46,35 @@ ORDER BY
 temp = pd.read_sql(query, engine)
 print(temp)
 
+#%% Unique contributing factors
+query = """
+SELECT DISTINCT vehicle_type_code_1 AS factor FROM collisions
+UNION
+SELECT DISTINCT vehicle_type_code_2 FROM collisions
+UNION
+SELECT DISTINCT vehicle_type_code_3 FROM collisions
+UNION
+SELECT DISTINCT vehicle_type_code_4 FROM collisions
+UNION
+SELECT DISTINCT vehicle_type_code_5 FROM collisions
+ORDER BY factor;
+"""
+
+temp = pd.read_sql(query, engine)
+print(temp)
+
+# Filter for vehicle types containing 'bike' or 'bicycle'
+bike_strings = temp[temp['factor'].str.contains('bike|bicycle', case=False, na=False)]
+
+# Convert to list
+bike_strings_list = bike_strings['factor'].tolist()
+
+print(bike_strings_list)
+
+# Entries to remove
+to_remove = ['Dirt Bike', 'DIRTBIKE', 'gas bike', 'Minibike', 'Motorbike']
+
+# Filter the list
+bike_strings_list = [item for item in bike_strings_list if item not in to_remove]
+
+print(bike_strings_list)
