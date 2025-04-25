@@ -7,7 +7,7 @@ import shutil
 
 #%% Download configuration
 url = "https://data.cityofnewyork.us/api/views/h9gi-nx95/rows.csv?accessType=DOWNLOAD"
-DEST_DIR = "./99_temp"
+DEST_DIR = "./99_temp/"
 FILENAME = "nyc_motor_vehicle_collisions.csv"
 FILE_PATH = os.path.join(DEST_DIR, FILENAME)
 
@@ -58,12 +58,12 @@ for i, chunk in enumerate(chunks, start=1):
 
     # Filter for year 2024 only (Observations for some earlier years made problems and are not needed anyways right now)
     if "crash_date" in chunk.columns:
-        chunk = chunk[chunk["crash_date"].dt.year == 2024]
-        print(f"Keeping {len(chunk)} rows from year 2024")
+        chunk = chunk[chunk["crash_date"].dt.year >= 2010]
+        print(f"Keeping {len(chunk)} rows from years > 2010")
 
     # Skip insert if chunk is now empty
     if chunk.empty:
-        print(f"Chunk {i} had no 2024 entries, skipping.")
+        print(f"Chunk {i} had no >2010 entries, skipping.")
         continue
 
     # Insert into database (table name = collisions)
