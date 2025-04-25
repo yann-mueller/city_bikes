@@ -457,5 +457,6 @@ bike_accidents = temp["bike_accidents"].tolist()
 sub_create_map.plot_zip_map(
     zip_codes=zip_codes,
     values=bike_accidents,
-    output_name='bike_accidents_zip'
+    output_name='bike_accidents_zip',
+    value_label='bike_accidents'
 )

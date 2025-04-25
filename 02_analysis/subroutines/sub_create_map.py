@@ -13,26 +13,27 @@ def plot_zip_map(
         zip_codes: list,
         values: list,
         output_name: str,
-        csv_path: str = "02_analysis\subroutines\input\map_nyc\Modified_Zip_Code_Tabulation_Areas_MODZCTA_20250425.csv",
+        csv_path: str = "02_analysis/subroutines/input/map_nyc/Modified_Zip_Code_Tabulation_Areas_MODZCTA_20250425.csv",
         zip_column: str = "MODZCTA",
-        value_label: str = "value"
+        value_label: str = "value",
+        plot_title: str = "NYC Zip Code Map (colored by value)"
 ):
     """
     Plot a choropleth map of NYC zip code areas based on a CSV with geometry.
 
     Parameters:
-    - csv_path: Path to CSV with zip geometries.
     - zip_codes: List of zip codes to color.
     - values: List of values to use for color scale.
-    - output_path: Path to save the output PNG.
-    - zip_column: Column in the CSV corresponding to ZIP codes.
-    - value_label: Name of the value column (for legend).
+    - output_name: Filename (without .png extension) for saving the plot.
+    - csv_path: Path to ZIP geometry CSV.
+    - zip_column: Column in the shapefile for ZIP code.
+    - value_label: Column name for coloring.
+    - plot_title: Title displayed above the map.
     """
 
-    # Load CSV
+    # Load and parse
     df = pd.read_csv(csv_path)
-    df[value_label] = pd.NA
-    output_path = f"02_analysis/plots/{output_name}.png",
+    output_path = f"02_analysis/plots/{output_name}.png"
 
     # Detect WKT geometry column
     geometry_col = None
@@ -40,35 +41,48 @@ def plot_zip_map(
         if df[col].astype(str).str.startswith('MULTI').any() or df[col].astype(str).str.startswith('POLYGON').any():
             geometry_col = col
             break
-
     if not geometry_col:
         raise ValueError("No WKT geometry column found in CSV.")
 
-    # Convert geometry
     df[geometry_col] = df[geometry_col].apply(wkt.loads)
     gdf = gpd.GeoDataFrame(df, geometry=df[geometry_col], crs="EPSG:4326")
 
-    # Merge with provided values
+    # Merge with input values
+    gdf[zip_column] = gdf[zip_column].astype(str)
     zip_value_df = pd.DataFrame({zip_column: zip_codes, value_label: values})
+    zip_value_df[zip_column] = zip_value_df[zip_column].astype(str)
     merged = gdf.merge(zip_value_df, on=zip_column, how="left")
 
-    # Create output folder
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    # Plot with color scale
-    ax = merged.plot(
+    # Plot setup
+    fig, ax = plt.subplots(figsize=(10, 10))
+    color_map = merged.plot(
         column=value_label,
         cmap="viridis",
-        figsize=(10, 10),
         edgecolor="black",
         legend=True,
+        ax=ax,
         missing_kwds={"color": "lightgrey", "label": "No data"}
     )
 
-    plt.title("NYC Zip Code Map (colored by value)")
-    plt.axis('off')
+    # Title
+    ax.set_title(plot_title, fontsize=18)
+    ax.axis('off')
+
+    # Adjust colorbar
+    cbar = color_map.get_figure().get_axes()[-1]
+    cbar.set_ylabel(value_label, fontsize=14)
+    cbar.tick_params(labelsize=12)
+
+    # Shrink colorbar height by 50%
+    box = cbar.get_position()
+    cbar.set_position([box.x0, box.y0 + box.height * 0.25, box.width, box.height * 0.5])
+
     plt.savefig(output_path, bbox_inches='tight', dpi=300)
     plt.close()
 
-    print(f"🖼️ Map saved to: {output_path}")
+    print(f"Map saved to: {output_path}")
+
+
 
