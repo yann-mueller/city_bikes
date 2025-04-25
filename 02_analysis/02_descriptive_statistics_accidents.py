@@ -166,3 +166,80 @@ plt.tight_layout()
 
 # Save
 plt.savefig("02_analysis/plots/monthly_bike_accidents_2024.png")
+
+#%% Fatal Bike Accidents
+# Updated SQL query to include injured/fatal bike-related accidents
+query = f"""
+WITH bike_accidents AS (
+    SELECT 
+        DATE_TRUNC('month', crash_date) AS month,
+        COUNT(*) AS bike_accidents
+    FROM collisions
+    WHERE crash_date >= '2024-01-01' AND crash_date < '2025-01-01'
+      AND (
+          vehicle_type_code_1 IN {bike_tuple} OR
+          vehicle_type_code_2 IN {bike_tuple} OR
+          vehicle_type_code_3 IN {bike_tuple} OR
+          vehicle_type_code_4 IN {bike_tuple} OR
+          vehicle_type_code_5 IN {bike_tuple}
+      )
+    GROUP BY month
+),
+injured_bike_accidents AS (
+    SELECT 
+        DATE_TRUNC('month', crash_date) AS month,
+        COUNT(*) AS injured_bike_accidents
+    FROM collisions
+    WHERE crash_date >= '2024-01-01' AND crash_date < '2025-01-01'
+      AND (
+          vehicle_type_code_1 IN {bike_tuple} OR
+          vehicle_type_code_2 IN {bike_tuple} OR
+          vehicle_type_code_3 IN {bike_tuple} OR
+          vehicle_type_code_4 IN {bike_tuple} OR
+          vehicle_type_code_5 IN {bike_tuple}
+      )
+      AND (
+          number_of_cyclist_injured >= 1 OR
+          number_of_pedestrians_injured >= 1
+      )
+    GROUP BY month
+),
+fatal_bike_accidents AS (
+    SELECT 
+        DATE_TRUNC('month', crash_date) AS month,
+        COUNT(*) AS fatal_bike_accidents
+    FROM collisions
+    WHERE crash_date >= '2024-01-01' AND crash_date < '2025-01-01'
+      AND (
+          vehicle_type_code_1 IN {bike_tuple} OR
+          vehicle_type_code_2 IN {bike_tuple} OR
+          vehicle_type_code_3 IN {bike_tuple} OR
+          vehicle_type_code_4 IN {bike_tuple} OR
+          vehicle_type_code_5 IN {bike_tuple}
+      )
+      AND (
+          number_of_cyclist_killed >= 1 OR
+          number_of_pedestrians_killed >= 1
+      )
+    GROUP BY month
+)
+SELECT 
+    b.month,
+    b.bike_accidents,
+    COALESCE(i.injured_bike_accidents, 0) AS injured_bike_accidents,
+    COALESCE(f.fatal_bike_accidents, 0) AS fatal_bike_accidents,
+    ROUND(COALESCE(i.injured_bike_accidents, 0)::decimal / NULLIF(b.bike_accidents, 0), 4) AS injured_share,
+    ROUND(COALESCE(f.fatal_bike_accidents, 0)::decimal / NULLIF(b.bike_accidents, 0), 4) AS fatal_share
+FROM 
+    bike_accidents b
+LEFT JOIN 
+    injured_bike_accidents i ON b.month = i.month
+LEFT JOIN 
+    fatal_bike_accidents f ON b.month = f.month
+ORDER BY 
+    b.month;
+"""
+
+temp = pd.read_sql(query, engine)
+print(temp)
+
