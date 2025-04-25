@@ -26,8 +26,8 @@ temp = pd.read_sql(query, engine)
 print(temp)
 
 #%% Number of unique stations
-df = pd.read_sql("SELECT COUNT(DISTINCT start_station_id) AS unique_start_stations FROM trips", con=engine)
-print(df)
+temp = pd.read_sql("SELECT COUNT(DISTINCT start_station_id) AS unique_start_stations FROM trips", con=engine)
+print(temp)
 
 
 
@@ -46,15 +46,15 @@ GROUP BY month
 ORDER BY month;
 """
 
-df = pd.read_sql(query, engine)
-print(df)
-#%% Plot: Rides per Month
-df['month_label'] = df['month'].dt.strftime('%B')  # e.g., "January"
-df['num_rides_millions'] = df['num_rides'] / 1_000_000
+temp = pd.read_sql(query, engine)
+print(temp)
+# Plot: Rides per Month
+temp['month_label'] = temp['month'].dt.strftime('%B')  # e.g., "January"
+temp['num_rides_millions'] = temp['num_rides'] / 1_000_000
 
 # Plot
 plt.figure(figsize=(10, 5))
-plt.bar(df['month_label'], df['num_rides_millions'], color="#1f77b4")
+plt.bar(temp['month_label'], temp['num_rides_millions'], color="#1f77b4")
 
 plt.xlabel("Monat", fontsize=16)
 plt.ylabel("Anzahl Fahrten (in Millionen)", fontsize=16, labelpad=15)
@@ -70,28 +70,28 @@ plt.savefig("02_analysis/plots/monthly_rides_2024.png")
 
 
 #%%
-df = pd.read_sql("""
+temp = pd.read_sql("""
     SELECT MIN(started_at) AS first_ride, MAX(started_at) AS last_ride
     FROM trips
 """, con=engine)
-print(df)
+print(temp)
 
 #%%
-df = pd.read_sql("""
+temp = pd.read_sql("""
     SELECT start_station_name, COUNT(*) AS ride_count
     FROM trips
     GROUP BY start_station_name
     ORDER BY ride_count DESC
     LIMIT 10
 """, con=engine)
-print(df)
+print(temp)
 
 #%%
-df = pd.read_sql("""
+temp = pd.read_sql("""
     SELECT member_casual, COUNT(*) AS num_rides
     FROM trips
     GROUP BY member_casual
 """, con=engine)
-print(df)
+print(temp)
 
 
