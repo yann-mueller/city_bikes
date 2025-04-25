@@ -1,5 +1,4 @@
 ### Download and build rides database
-
 import os
 import requests
 import zipfile
@@ -7,7 +6,6 @@ import pandas as pd
 import shutil
 from sqlalchemy import create_engine, text
 #%%
-
 # Configuration
 # URLs of the 2024 data
 ZIP_URLS = [
@@ -21,8 +19,8 @@ ZIP_URLS = [
     #"https://s3.amazonaws.com/tripdata/202408-citibike-tripdata.zip",
     #"https://s3.amazonaws.com/tripdata/202409-citibike-tripdata.zip",
     "https://s3.amazonaws.com/tripdata/202410-citibike-tripdata.zip",
-    "https://s3.amazonaws.com/tripdata/202411-citibike-tripdata.zip",
-    "https://s3.amazonaws.com/tripdata/202412-citibike-tripdata.zip"
+    #"https://s3.amazonaws.com/tripdata/202411-citibike-tripdata.zip",
+    #"https://s3.amazonaws.com/tripdata/202412-citibike-tripdata.zip"
 ]
 
 DEST_DIR = "./99_temp"
@@ -45,10 +43,10 @@ with engine.connect() as conn:
     """))
     db_columns = [row[0] for row in result]
 
-
 # Ensure temp directory exists
 os.makedirs(DEST_DIR, exist_ok=True)
 
+# Define size of chunks in order to process the .csv files
 chunksize = 1000
 
 # Process each .csv file from CitiBike
@@ -62,14 +60,24 @@ for ZIP_URL in ZIP_URLS:
         f.write(r.content)
     print(f"Downloaded to {ZIP_PATH}")
 
-    # === Extract all CSVs ===
-    print("Extracting CSV(s)...")
+    # Extract all .csv files
+    print("Extracting .csv files...")
     with zipfile.ZipFile(ZIP_PATH, 'r') as zip_ref:
         zip_ref.extractall(DEST_DIR)
-    csv_files = [os.path.join(DEST_DIR, f) for f in os.listdir(DEST_DIR) if f.endswith(".csv")]
-    print(f"Found {len(csv_files)} CSV file(s):", csv_files)
 
-    # Load all CSVs into database (append mode)
+    # First: Check for .csv files directly in DEST_DIR (For some months the .csv files are located in a subfolder)
+    csv_files = [os.path.join(DEST_DIR, f) for f in os.listdir(DEST_DIR) if f.endswith(".csv")]
+
+    # If none found, search recursively in subfolders
+    if not csv_files:
+        print("No .csv files found directly in DEST_DIR. Searching in subfolders...")
+        csv_files = [os.path.join(root, file)
+                     for root, _, files in os.walk(DEST_DIR)
+                     for file in files if file.endswith(".csv")]
+
+    print(f"Found {len(csv_files)} .csv files:", csv_files)
+
+    # Load all .csv files into database
     for csv in csv_files:
         print(f"Loading {csv} into PostgreSQL in chunks...")
 
@@ -89,7 +97,7 @@ for ZIP_URL in ZIP_URLS:
             num_params = chunk.notna().sum().sum()
             print(f"Chunk {i} → Parameters: {num_params}")
 
-            # Normalize column names (do this first so we can match correct column names below)
+            # Normalize column names
             chunk.columns = [col.lower().strip().replace(" ", "_") for col in chunk.columns]
 
             # Drop duplicate columns
