@@ -63,7 +63,8 @@ bike_strings_list = bike_strings['factor'].tolist()
 print(bike_strings_list)
 
 # Entries to remove
-to_remove = ['Dirt Bike', 'DIRTBIKE', 'gas bike', 'Minibike', 'Motorbike']
+to_remove = ['Dart bike', 'dirt bike', 'Dirt Bike', 'DIRT BIKE', 'dirtbike', 'Dirtbike', 'DIRTBIKE', 'Moped bike',
+             'gas bike', 'Minibike', 'Motorbike', 'motorbike', 'PEDAL BIKE', 'Dirt Bike']
 
 # Filter the list
 bike_strings_list = [item for item in bike_strings_list if item not in to_remove]
@@ -73,7 +74,7 @@ print(bike_strings_list)
 # Create a tuple of strings for SQL IN clause
 bike_tuple = tuple(bike_strings_list)
 
-#%% Total Accidents in 2024
+#%% Total Accidents in 2010-2024
 temp = pd.read_sql("SELECT COUNT(*) AS total_accidents FROM collisions;", engine)
 print(temp)
 
@@ -258,7 +259,7 @@ temp = pd.read_sql(query, engine)
 print(temp)
 
 
-#%% Accidents by 3-Hour Time Slots
+#%% Accidents by 3-Hour Time Slots (2010-2024)
 query = f"""
 WITH all_collisions AS (
     SELECT 
@@ -274,7 +275,6 @@ WITH all_collisions AS (
         number_of_cyclist_killed,
         number_of_pedestrians_killed
     FROM collisions
-    WHERE crash_date >= '2024-01-01' AND crash_date < '2025-01-01'
 ),
 bike_crashes AS (
     SELECT 
@@ -323,7 +323,7 @@ temp['time_slot'] = temp['hour_bin'].apply(lambda h: f"{h:02d}:00–{(h + 3) % 2
 temp = temp[['time_slot', 'bike_accidents', 'injured_bike_accidents', 'injured_share', 'fatal_bike_accidents', 'fatal_share']]
 print(temp)
 
-#%% Accidents by Borough
+#%% Accidents by Borough (2010-2024)
 query = f"""
 WITH bike_collisions AS (
     SELECT 
@@ -339,7 +339,6 @@ WITH bike_collisions AS (
         vehicle_type_code_4,
         vehicle_type_code_5
     FROM collisions
-    WHERE crash_date >= '2024-01-01' AND crash_date < '2025-01-01'
 ),
 bike_crashes AS (
     SELECT 
@@ -383,7 +382,7 @@ temp = pd.read_sql(query, engine)
 print(temp)
 
 
-#%% Accidents by Zip Code
+#%% Accidents by Zip Code (2010-2024)
 query = f"""
 WITH bike_collisions AS (
     SELECT 
@@ -399,7 +398,6 @@ WITH bike_collisions AS (
         vehicle_type_code_4,
         vehicle_type_code_5
     FROM collisions
-    WHERE crash_date >= '2024-01-01' AND crash_date < '2025-01-01'
 ),
 bike_crashes AS (
     SELECT 
@@ -431,8 +429,8 @@ SELECT
     bike_accidents,
     injured_bike_accidents,
     fatal_bike_accidents,
-    ROUND(injured_bike_accidents::decimal / NULLIF(bike_accidents, 0), 4) AS injured_share,
-    ROUND(fatal_bike_accidents::decimal / NULLIF(bike_accidents, 0), 4) AS fatal_share
+    ROUND(injured_bike_accidents::decimal / NULLIF(bike_accidents, 0) * 100, 2) AS injured_share,
+    ROUND(fatal_bike_accidents::decimal / NULLIF(bike_accidents, 0) * 100, 2) AS fatal_share
 FROM 
     bike_crashes
 ORDER BY 
@@ -449,16 +447,25 @@ temp = temp.dropna(subset=["zip_code"])
 # Convert zip_code to string (important for matching shapefile)
 temp["zip_code"] = temp["zip_code"].astype(int).astype(str)
 
-# 3. Extract values
+# Extract values
 zip_codes = temp["zip_code"].tolist()
 bike_accidents = temp["bike_accidents"].tolist()
 
-# 4. Call the map function
+# Call the map function
 sub_create_map.plot_zip_map(
     zip_codes=zip_codes,
     values=bike_accidents,
     output_name='bike_accidents_zip',
     value_label='bike_accidents',
     legend_label='Anzahl Unfälle',
-    plot_title='Fahrradunfälle nach ZIP Code (2024)'
+    plot_title='Fahrradunfälle nach ZIP Code (2010 - 2024)'
+)
+
+sub_create_map.plot_zip_map(
+    zip_codes=zip_codes,
+    values=bike_accidents,
+    output_name='bike_accidents_share_injured_zip',
+    value_label='injured_share',
+    legend_label='Anteil (%))',
+    plot_title='Anteil Unfälle mit Verletzungen nach ZIP Code (2010 - 2024)'
 )
