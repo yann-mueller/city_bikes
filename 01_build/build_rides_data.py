@@ -37,6 +37,15 @@ DB_NAME = "citibike"
 # Setup database connection
 engine = create_engine(f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
 
+with engine.connect() as conn:
+    result = conn.execute(text("""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = 'trips'
+    """))
+    db_columns = [row[0] for row in result]
+
+
 # Ensure temp directory exists
 os.makedirs(DEST_DIR, exist_ok=True)
 
@@ -84,7 +93,7 @@ for ZIP_URL in ZIP_URLS:
             chunk.columns = [col.lower().strip().replace(" ", "_") for col in chunk.columns]
 
             # Drop duplicate columns
-            chunk = chunk.loc[:, ~pd.Series(chunk.columns).duplicated()]
+            chunk = chunk.loc[:, ~chunk.columns.duplicated()]
 
             # Remove any 'unnamed' columns that sneak in from CSV index, and make a fresh copy to avoid SettingWithCopyWarning
             chunk = chunk.loc[:, ~chunk.columns.str.contains("^unnamed", case=False)].copy()
@@ -101,6 +110,8 @@ for ZIP_URL in ZIP_URLS:
 
             # Append to database
             try:
+                # Keep only columns that exist in the database
+                chunk = chunk[[col for col in chunk.columns if col in db_columns]]
                 chunk.to_sql("trips", engine, if_exists="append", index=False, method="multi")
             except Exception as e:
                 print(f"Chunk {i} failed! Params: {num_params}, shape: {chunk.shape}")
