@@ -367,3 +367,63 @@ ORDER BY
 
 temp = pd.read_sql(query, engine)
 print(temp)
+
+
+#%% Accidents by Zip Code
+query = f"""
+WITH bike_collisions AS (
+    SELECT 
+        zip_code,
+        number_of_persons_injured,
+        number_of_cyclist_injured,
+        number_of_pedestrians_injured,
+        number_of_cyclist_killed,
+        number_of_pedestrians_killed,
+        vehicle_type_code_1,
+        vehicle_type_code_2,
+        vehicle_type_code_3,
+        vehicle_type_code_4,
+        vehicle_type_code_5
+    FROM collisions
+    WHERE crash_date >= '2024-01-01' AND crash_date < '2025-01-01'
+),
+bike_crashes AS (
+    SELECT 
+        zip_code,
+        COUNT(*) AS bike_accidents,
+        SUM(
+            CASE 
+                WHEN number_of_persons_injured >= 1 OR number_of_cyclist_injured >= 1 OR number_of_pedestrians_injured >= 1 
+                THEN 1 ELSE 0 
+            END
+        ) AS injured_bike_accidents,
+        SUM(
+            CASE 
+                WHEN number_of_cyclist_killed >= 1 OR number_of_pedestrians_killed >= 1 
+                THEN 1 ELSE 0 
+            END
+        ) AS fatal_bike_accidents
+    FROM bike_collisions
+    WHERE 
+        vehicle_type_code_1 IN {bike_tuple} OR
+        vehicle_type_code_2 IN {bike_tuple} OR
+        vehicle_type_code_3 IN {bike_tuple} OR
+        vehicle_type_code_4 IN {bike_tuple} OR
+        vehicle_type_code_5 IN {bike_tuple}
+    GROUP BY zip_code
+)
+SELECT 
+    zip_code,
+    bike_accidents,
+    injured_bike_accidents,
+    fatal_bike_accidents,
+    ROUND(injured_bike_accidents::decimal / NULLIF(bike_accidents, 0), 4) AS injured_share,
+    ROUND(fatal_bike_accidents::decimal / NULLIF(bike_accidents, 0), 4) AS fatal_share
+FROM 
+    bike_crashes
+ORDER BY 
+    bike_accidents DESC;
+"""
+
+temp = pd.read_sql(query, engine)
+print(temp)
