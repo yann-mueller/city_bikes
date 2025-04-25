@@ -83,6 +83,9 @@ for ZIP_URL in ZIP_URLS:
             # Normalize column names (do this first so we can match correct column names below)
             chunk.columns = [col.lower().strip().replace(" ", "_") for col in chunk.columns]
 
+            # Drop duplicate columns
+            chunk = chunk.loc[:, ~pd.Series(chunk.columns).duplicated()]
+
             # Remove any 'unnamed' columns that sneak in from CSV index, and make a fresh copy to avoid SettingWithCopyWarning
             chunk = chunk.loc[:, ~chunk.columns.str.contains("^unnamed", case=False)].copy()
 
