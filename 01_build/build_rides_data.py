@@ -11,13 +11,13 @@ from sqlalchemy import create_engine, text
 # Configuration
 # URLs of the 2024 data
 ZIP_URLS = [
-    "https://s3.amazonaws.com/tripdata/202401-citibike-tripdata.csv.zip",
-    "https://s3.amazonaws.com/tripdata/202402-citibike-tripdata.csv.zip",
-    "https://s3.amazonaws.com/tripdata/202403-citibike-tripdata.csv.zip",
-    "https://s3.amazonaws.com/tripdata/202404-citibike-tripdata.csv.zip",
-    "https://s3.amazonaws.com/tripdata/202405-citibike-tripdata.zip",
-    "https://s3.amazonaws.com/tripdata/202406-citibike-tripdata.zip",
-    "https://s3.amazonaws.com/tripdata/202407-citibike-tripdata.zip",
+    #"https://s3.amazonaws.com/tripdata/202401-citibike-tripdata.csv.zip",
+    #"https://s3.amazonaws.com/tripdata/202402-citibike-tripdata.csv.zip",
+    #"https://s3.amazonaws.com/tripdata/202403-citibike-tripdata.csv.zip",
+    #"https://s3.amazonaws.com/tripdata/202404-citibike-tripdata.csv.zip",
+    #"https://s3.amazonaws.com/tripdata/202405-citibike-tripdata.zip",
+    #"https://s3.amazonaws.com/tripdata/202406-citibike-tripdata.zip",
+    #"https://s3.amazonaws.com/tripdata/202407-citibike-tripdata.zip",
     "https://s3.amazonaws.com/tripdata/202408-citibike-tripdata.zip",
     "https://s3.amazonaws.com/tripdata/202409-citibike-tripdata.zip",
     "https://s3.amazonaws.com/tripdata/202410-citibike-tripdata.zip",
