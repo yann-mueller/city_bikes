@@ -80,6 +80,9 @@ for ZIP_URL in ZIP_URLS:
             num_params = chunk.notna().sum().sum()
             print(f"Chunk {i}/{total_chunks} → Parameters: {num_params}")
 
+            # Remove any 'unnamed' columns that sneak in from CSV index
+            chunk = chunk.loc[:, ~chunk.columns.str.contains("^unnamed", case=False)]
+
             # Normalize column names
             chunk.columns = [col.lower().strip().replace(" ", "_") for col in chunk.columns]
 
