@@ -58,7 +58,7 @@ plt.bar(df['month_label'], df['num_rides_millions'], color="#1f77b4")
 
 plt.xlabel("Monat", fontsize=16)
 plt.ylabel("Anzahl Fahrten (in Millionen)", fontsize=16, labelpad=15)
-plt.title("Monatliche CitiBike Fahrten – 2024", fontsize=18)
+plt.title("Monatliche CitiBike Fahrten – 2024", fontsize=18, pad=20)
 
 plt.xticks(fontsize=14)
 plt.yticks(fontsize=14)
