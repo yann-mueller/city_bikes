@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from sqlalchemy import create_engine
 
+from subroutines.input.01_create_map import plot_zip_map
+
 # Database connection
 engine = create_engine("postgresql://postgres:axa_datascience@localhost:5432/nypd")
 
