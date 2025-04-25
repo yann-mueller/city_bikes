@@ -23,3 +23,26 @@ ORDER BY
 
 temp = pd.read_sql(query, engine)
 print(temp)
+
+#%% Total Accidents in 2024
+temp = pd.read_sql("SELECT COUNT(*) AS total_accidents FROM collisions;", engine)
+print(temp)
+
+#%% Total accidents per month
+query = """
+SELECT 
+    DATE_TRUNC('month', crash_date) AS month,
+    COUNT(*) AS total_accidents
+FROM 
+    collisions
+WHERE 
+    crash_date >= '2024-01-01' AND crash_date < '2025-01-01'
+GROUP BY 
+    month
+ORDER BY 
+    month;
+"""
+
+temp = pd.read_sql(query, engine)
+print(temp)
+
