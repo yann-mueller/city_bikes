@@ -450,6 +450,7 @@ temp["zip_code"] = temp["zip_code"].astype(int).astype(str)
 # Extract values
 zip_codes = temp["zip_code"].tolist()
 bike_accidents = temp["bike_accidents"].tolist()
+injured_share = temp["injured_share"].tolist()
 
 # Call the map function
 sub_create_map.plot_zip_map(
@@ -463,9 +464,9 @@ sub_create_map.plot_zip_map(
 
 sub_create_map.plot_zip_map(
     zip_codes=zip_codes,
-    values=bike_accidents,
+    values=injured_share,
     output_name='bike_accidents_share_injured_zip',
     value_label='injured_share',
-    legend_label='Anteil (%))',
+    legend_label='Anteil (%)',
     plot_title='Anteil Unfälle mit Verletzungen nach ZIP Code (2010 - 2024)'
 )
