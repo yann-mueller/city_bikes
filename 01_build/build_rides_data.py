@@ -11,13 +11,13 @@ from sqlalchemy import create_engine, text
 # Configuration
 # URLs of the 2024 data
 ZIP_URLS = [
-    #"https://s3.amazonaws.com/tripdata/202401-citibike-tripdata.csv.zip",
-    #"https://s3.amazonaws.com/tripdata/202402-citibike-tripdata.csv.zip",
-    #"https://s3.amazonaws.com/tripdata/202403-citibike-tripdata.csv.zip",
-    #"https://s3.amazonaws.com/tripdata/202404-citibike-tripdata.csv.zip",
-    #"https://s3.amazonaws.com/tripdata/202405-citibike-tripdata.zip",
-    #"https://s3.amazonaws.com/tripdata/202406-citibike-tripdata.zip",
-    #"https://s3.amazonaws.com/tripdata/202407-citibike-tripdata.zip",
+    "https://s3.amazonaws.com/tripdata/202401-citibike-tripdata.csv.zip",
+    "https://s3.amazonaws.com/tripdata/202402-citibike-tripdata.csv.zip",
+    "https://s3.amazonaws.com/tripdata/202403-citibike-tripdata.csv.zip",
+    "https://s3.amazonaws.com/tripdata/202404-citibike-tripdata.csv.zip",
+    "https://s3.amazonaws.com/tripdata/202405-citibike-tripdata.zip",
+    "https://s3.amazonaws.com/tripdata/202406-citibike-tripdata.zip",
+    "https://s3.amazonaws.com/tripdata/202407-citibike-tripdata.zip",
     "https://s3.amazonaws.com/tripdata/202408-citibike-tripdata.zip",
     "https://s3.amazonaws.com/tripdata/202409-citibike-tripdata.zip",
     "https://s3.amazonaws.com/tripdata/202410-citibike-tripdata.zip",
@@ -56,22 +56,22 @@ for ZIP_URL in ZIP_URLS:
     zip_filename = os.path.basename(ZIP_URL)
     ZIP_PATH = os.path.join(DEST_DIR, zip_filename)
 
-    print(f"\n📥 Downloading {zip_filename}...")
+    print(f"\nDownloading {zip_filename}...")
     r = requests.get(ZIP_URL)
     with open(ZIP_PATH, "wb") as f:
         f.write(r.content)
-    print(f"✅ Downloaded to {ZIP_PATH}")
+    print(f"Downloaded to {ZIP_PATH}")
 
     # === Extract all CSVs ===
-    print("📦 Extracting CSV(s)...")
+    print("Extracting CSV(s)...")
     with zipfile.ZipFile(ZIP_PATH, 'r') as zip_ref:
         zip_ref.extractall(DEST_DIR)
     csv_files = [os.path.join(DEST_DIR, f) for f in os.listdir(DEST_DIR) if f.endswith(".csv")]
-    print(f"🗃️ Found {len(csv_files)} CSV file(s):", csv_files)
+    print(f"Found {len(csv_files)} CSV file(s):", csv_files)
 
     # Load all CSVs into database (append mode)
     for csv in csv_files:
-        print(f"🚀 Loading {csv} into PostgreSQL in chunks...")
+        print(f"Loading {csv} into PostgreSQL in chunks...")
 
         dtype_spec = {
             'start_station_id': str,
@@ -120,7 +120,7 @@ for ZIP_URL in ZIP_URLS:
                 chunk.to_csv(f"debug_failed_chunk_{i}.csv", index=False)
                 break
 
-        print("✅ All chunks loaded.")
+        print("All chunks loaded.")
 
     # Remove temporary .csv files
     print("🧹 Cleaning up...")
@@ -131,9 +131,9 @@ for ZIP_URL in ZIP_URLS:
             os.remove(path)
         elif os.path.isdir(path):
             shutil.rmtree(path)
-    print("✅ Cleanup complete for this file.")
+    print("Cleanup complete for this file.")
 
-print("\n🎉 All files processed successfully.")
+print("\nAll files processed successfully.")
 
 #%% Remove potential duplicate observations
 with engine.begin() as conn:
