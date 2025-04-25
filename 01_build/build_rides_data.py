@@ -17,7 +17,7 @@ ZIP_URLS = [
     #"https://s3.amazonaws.com/tripdata/202404-citibike-tripdata.csv.zip",
     #"https://s3.amazonaws.com/tripdata/202405-citibike-tripdata.zip",
     #"https://s3.amazonaws.com/tripdata/202406-citibike-tripdata.zip",
-    #"https://s3.amazonaws.com/tripdata/202407-citibike-tripdata.zip",
+    "https://s3.amazonaws.com/tripdata/202407-citibike-tripdata.zip",
     "https://s3.amazonaws.com/tripdata/202408-citibike-tripdata.zip",
     "https://s3.amazonaws.com/tripdata/202409-citibike-tripdata.zip",
     "https://s3.amazonaws.com/tripdata/202410-citibike-tripdata.zip",
@@ -39,6 +39,8 @@ engine = create_engine(f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{D
 
 # Ensure temp directory exists
 os.makedirs(DEST_DIR, exist_ok=True)
+
+chunksize = 1000
 
 # Process each .csv file from CitiBike
 for ZIP_URL in ZIP_URLS:
@@ -71,7 +73,8 @@ for ZIP_URL in ZIP_URLS:
         total_chunks = sum(1 for _ in pd.read_csv(csv, chunksize=chunksize, low_memory=False))  # estimate total chunks
 
         for i, chunk in enumerate(chunks, start=1):
-            print(f"📊 Processing chunk {i}/{total_chunks}...")
+            num_params = chunk.notna().sum().sum()
+            print(f"Chunk {i}/{total_chunks} → Parameters: {num_params}")
 
             # Normalize column names
             chunk.columns = [col.lower().strip().replace(" ", "_") for col in chunk.columns]
@@ -86,7 +89,14 @@ for ZIP_URL in ZIP_URLS:
                 chunk.iloc[:, 7] = chunk.iloc[:, 7].astype(str)
 
             # Append to database
-            chunk.to_sql("trips", engine, if_exists="append", index=False, method="multi")
+            try:
+                chunk.to_sql("trips", engine, if_exists="append", index=False, method="multi")
+            except Exception as e:
+                print(f"Chunk {i} failed! Params: {num_params}, shape: {chunk.shape}")
+                print(e)
+                # Save for debugging
+                chunk.to_csv(f"debug_failed_chunk_{i}.csv", index=False)
+                break
 
         print("✅ All chunks loaded.")
 
