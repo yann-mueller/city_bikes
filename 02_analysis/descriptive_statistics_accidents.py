@@ -1,14 +1,25 @@
 import matplotlib
-matplotlib.use('TkAgg')  # or 'QtAgg' if you have PyQt installed
+matplotlib.use('TkAgg')
 
+import sys
+import os
 import matplotlib.pyplot as plt
 import pandas as pd
 from sqlalchemy import create_engine
+import importlib.util
 
-from subroutines.input.sub_create_map import plot_zip_map
+# Path to the file you want to import from
+file_path = os.path.join(os.getcwd(), "02_analysis", "subroutines", "sub_create_map.py")
+
+# Load the module manually
+spec = importlib.util.spec_from_file_location("sub_create_map", file_path)
+sub_create_map = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(sub_create_map)
+
 
 # Database connection
 engine = create_engine("postgresql://postgres:axa_datascience@localhost:5432/nypd")
+
 
 #%% Column type information
 query = """
