@@ -17,7 +17,7 @@ ZIP_URLS = [
     #"https://s3.amazonaws.com/tripdata/202404-citibike-tripdata.csv.zip",
     #"https://s3.amazonaws.com/tripdata/202405-citibike-tripdata.zip",
     #"https://s3.amazonaws.com/tripdata/202406-citibike-tripdata.zip",
-    "https://s3.amazonaws.com/tripdata/202407-citibike-tripdata.zip",
+    #"https://s3.amazonaws.com/tripdata/202407-citibike-tripdata.zip",
     "https://s3.amazonaws.com/tripdata/202408-citibike-tripdata.zip",
     "https://s3.amazonaws.com/tripdata/202409-citibike-tripdata.zip",
     "https://s3.amazonaws.com/tripdata/202410-citibike-tripdata.zip",
@@ -76,9 +76,9 @@ for ZIP_URL in ZIP_URLS:
         chunks = pd.read_csv(csv, chunksize=chunksize, low_memory=False, dtype=dtype_spec)
         total_chunks = sum(1 for _ in pd.read_csv(csv, chunksize=chunksize, low_memory=False))  # estimate total chunks
 
-        for i, chunk in enumerate(chunks, start=1):
+        for i, chunk in enumerate(pd.read_csv(csv, chunksize=chunksize, low_memory=False, dtype=dtype_spec), start=1):
             num_params = chunk.notna().sum().sum()
-            print(f"Chunk {i}/{total_chunks} → Parameters: {num_params}")
+            print(f"Chunk {i} → Parameters: {num_params}")
 
             # Normalize column names (do this first so we can match correct column names below)
             chunk.columns = [col.lower().strip().replace(" ", "_") for col in chunk.columns]
