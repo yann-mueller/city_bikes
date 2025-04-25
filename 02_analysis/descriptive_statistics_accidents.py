@@ -16,12 +16,12 @@ spec = importlib.util.spec_from_file_location("sub_create_map", file_path)
 sub_create_map = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(sub_create_map)
 
-
+#%%
 # Database connection
 engine = create_engine("postgresql://postgres:axa_datascience@localhost:5432/nypd")
 
 
-#%% Column type information
+# Column type information
 query = """
 SELECT 
     column_name, 
@@ -37,29 +37,7 @@ ORDER BY
 temp = pd.read_sql(query, engine)
 print(temp)
 
-#%% Total Accidents in 2024
-temp = pd.read_sql("SELECT COUNT(*) AS total_accidents FROM collisions;", engine)
-print(temp)
-
-#%% Total accidents per month
-query = """
-SELECT 
-    DATE_TRUNC('month', crash_date) AS month,
-    COUNT(*) AS total_accidents
-FROM 
-    collisions
-WHERE 
-    crash_date >= '2024-01-01' AND crash_date < '2025-01-01'
-GROUP BY 
-    month
-ORDER BY 
-    month;
-"""
-
-temp = pd.read_sql(query, engine)
-print(temp)
-
-#%% Unique contributing factors
+# Unique contributing factors
 query = """
 SELECT DISTINCT vehicle_type_code_1 AS factor FROM collisions
 UNION
@@ -92,10 +70,33 @@ bike_strings_list = [item for item in bike_strings_list if item not in to_remove
 
 print(bike_strings_list)
 
-#%% Summarizing table & Plot
 # Create a tuple of strings for SQL IN clause
 bike_tuple = tuple(bike_strings_list)
 
+#%% Total Accidents in 2024
+temp = pd.read_sql("SELECT COUNT(*) AS total_accidents FROM collisions;", engine)
+print(temp)
+
+#%% Total accidents per month
+query = """
+SELECT 
+    DATE_TRUNC('month', crash_date) AS month,
+    COUNT(*) AS total_accidents
+FROM 
+    collisions
+WHERE 
+    crash_date >= '2024-01-01' AND crash_date < '2025-01-01'
+GROUP BY 
+    month
+ORDER BY 
+    month;
+"""
+
+temp = pd.read_sql(query, engine)
+print(temp)
+
+
+#%% Summarizing table & Plot
 # SQL query to get both total and bike-related accidents per month
 query = f"""
 WITH monthly_totals AS (
@@ -440,3 +441,21 @@ ORDER BY
 
 temp = pd.read_sql(query, engine)
 print(temp)
+
+## Plot Accidents by ZIP Code
+# Drop NAs
+temp = temp.dropna(subset=["zip_code"])
+
+# Convert zip_code to string (important for matching shapefile)
+temp["zip_code"] = temp["zip_code"].astype(int).astype(str)
+
+# 3. Extract values
+zip_codes = temp["zip_code"].tolist()
+bike_accidents = temp["bike_accidents"].tolist()
+
+# 4. Call the map function
+sub_create_map.plot_zip_map(
+    zip_codes=zip_codes,
+    values=bike_accidents,
+    output_name='bike_accidents_zip'
+)

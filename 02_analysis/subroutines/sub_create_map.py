@@ -7,15 +7,13 @@ import shutil
 from shapely import wkt
 
 
-# Path to the CSV you want to visualize
-csv_path = r"02_analysis\subroutines\input\map_nyc\Modified_Zip_Code_Tabulation_Areas__MODZCTA__20250425.csv"
 
 #%% Load the CSV
 def plot_zip_map(
-        csv_path: str,
         zip_codes: list,
         values: list,
         output_name: str,
+        csv_path: str = "02_analysis\subroutines\input\map_nyc\Modified_Zip_Code_Tabulation_Areas_MODZCTA_20250425.csv",
         zip_column: str = "MODZCTA",
         value_label: str = "value"
 ):
