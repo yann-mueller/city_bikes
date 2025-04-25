@@ -459,5 +459,6 @@ sub_create_map.plot_zip_map(
     values=bike_accidents,
     output_name='bike_accidents_zip',
     value_label='bike_accidents',
-    plot_title='Bike Accidents by ZIP Code Area(2024)'
+    legend_label='Bike Accidents (2024)',
+    plot_title='Bike Accidents by ZIP Code (2024)'
 )
