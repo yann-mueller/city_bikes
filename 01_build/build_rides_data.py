@@ -69,6 +69,10 @@ for ZIP_URL in ZIP_URLS:
             'end_station_id': str
         }
 
+        with open(csv) as f:
+            total_lines = sum(1 for _ in f) - 1
+        total_chunks = (total_lines // chunksize) + 1
+
         chunks = pd.read_csv(csv, chunksize=chunksize, low_memory=False, dtype=dtype_spec)
         total_chunks = sum(1 for _ in pd.read_csv(csv, chunksize=chunksize, low_memory=False))  # estimate total chunks
 
