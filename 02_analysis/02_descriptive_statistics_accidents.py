@@ -246,75 +246,124 @@ print(temp)
 
 #%% Accidents by 3-Hour Time Slots
 query = f"""
-WITH bike_accidents AS (
+WITH all_collisions AS (
     SELECT 
-        DATE_TRUNC('day', crash_date) + (EXTRACT(hour FROM crash_time)::int / 3) * interval '3 hours' AS time_slot,
-        COUNT(*) AS bike_accidents
+        (EXTRACT(hour FROM crash_time)::int / 3) * 3 AS hour_bin,
+        vehicle_type_code_1,
+        vehicle_type_code_2,
+        vehicle_type_code_3,
+        vehicle_type_code_4,
+        vehicle_type_code_5,
+        number_of_persons_injured,
+        number_of_cyclist_injured,
+        number_of_pedestrians_injured,
+        number_of_cyclist_killed,
+        number_of_pedestrians_killed
     FROM collisions
     WHERE crash_date >= '2024-01-01' AND crash_date < '2025-01-01'
-      AND (
-          vehicle_type_code_1 IN {bike_tuple} OR
-          vehicle_type_code_2 IN {bike_tuple} OR
-          vehicle_type_code_3 IN {bike_tuple} OR
-          vehicle_type_code_4 IN {bike_tuple} OR
-          vehicle_type_code_5 IN {bike_tuple}
-      )
-    GROUP BY time_slot
 ),
-injured_bike_accidents AS (
+bike_crashes AS (
     SELECT 
-        DATE_TRUNC('day', crash_date) + (EXTRACT(hour FROM crash_time)::int / 3) * interval '3 hours' AS time_slot,
-        COUNT(*) AS injured_bike_accidents
-    FROM collisions
-    WHERE crash_date >= '2024-01-01' AND crash_date < '2025-01-01'
-      AND (
-          vehicle_type_code_1 IN {bike_tuple} OR
-          vehicle_type_code_2 IN {bike_tuple} OR
-          vehicle_type_code_3 IN {bike_tuple} OR
-          vehicle_type_code_4 IN {bike_tuple} OR
-          vehicle_type_code_5 IN {bike_tuple}
-      )
-      AND (
-          number_of_persons_injured >= 1 OR
-          number_of_cyclist_injured >= 1 OR
-          number_of_pedestrians_injured >= 1
-      )
-    GROUP BY time_slot
-),
-fatal_bike_accidents AS (
-    SELECT 
-        DATE_TRUNC('day', crash_date) + (EXTRACT(hour FROM crash_time)::int / 3) * interval '3 hours' AS time_slot,
-        COUNT(*) AS fatal_bike_accidents
-    FROM collisions
-    WHERE crash_date >= '2024-01-01' AND crash_date < '2025-01-01'
-      AND (
-          vehicle_type_code_1 IN {bike_tuple} OR
-          vehicle_type_code_2 IN {bike_tuple} OR
-          vehicle_type_code_3 IN {bike_tuple} OR
-          vehicle_type_code_4 IN {bike_tuple} OR
-          vehicle_type_code_5 IN {bike_tuple}
-      )
-      AND (
-          number_of_cyclist_killed >= 1 OR
-          number_of_pedestrians_killed >= 1
-      )
-    GROUP BY time_slot
+        hour_bin,
+        COUNT(*) AS bike_accidents,
+        SUM(
+            CASE 
+                WHEN number_of_persons_injured >= 1 OR number_of_cyclist_injured >= 1 OR number_of_pedestrians_injured >= 1 
+                THEN 1 ELSE 0 
+            END
+        ) AS injured_bike_accidents,
+        SUM(
+            CASE 
+                WHEN number_of_cyclist_killed >= 1 OR number_of_pedestrians_killed >= 1 
+                THEN 1 ELSE 0 
+            END
+        ) AS fatal_bike_accidents
+    FROM all_collisions
+    WHERE 
+        vehicle_type_code_1 IN {bike_tuple} OR
+        vehicle_type_code_2 IN {bike_tuple} OR
+        vehicle_type_code_3 IN {bike_tuple} OR
+        vehicle_type_code_4 IN {bike_tuple} OR
+        vehicle_type_code_5 IN {bike_tuple}
+    GROUP BY hour_bin
 )
 SELECT 
-    b.time_slot,
-    b.bike_accidents,
-    COALESCE(i.injured_bike_accidents, 0) AS injured_bike_accidents,
-    COALESCE(f.fatal_bike_accidents, 0) AS fatal_bike_accidents
+    hour_bin,
+    bike_accidents,
+    injured_bike_accidents,
+    fatal_bike_accidents,
+    ROUND(injured_bike_accidents::decimal / NULLIF(bike_accidents, 0), 4) AS injured_share,
+    ROUND(fatal_bike_accidents::decimal / NULLIF(bike_accidents, 0), 4) AS fatal_share
 FROM 
-    bike_accidents b
-LEFT JOIN 
-    injured_bike_accidents i ON b.time_slot = i.time_slot
-LEFT JOIN 
-    fatal_bike_accidents f ON b.time_slot = f.time_slot
+    bike_crashes
 ORDER BY 
-    b.time_slot;
+    hour_bin;
+"""
+
+temp = pd.read_sql(query, engine)
+
+# Optional: Label the time slots
+temp['time_slot'] = temp['hour_bin'].apply(lambda h: f"{h:02d}:00–{(h + 3) % 24:02d}:00")
+
+# Reorder columns
+temp = temp[['time_slot', 'bike_accidents', 'injured_bike_accidents', 'injured_share', 'fatal_bike_accidents', 'fatal_share']]
+print(temp)
+
+#%% Accidents by Borough
+query = f"""
+WITH bike_collisions AS (
+    SELECT 
+        borough,
+        number_of_persons_injured,
+        number_of_cyclist_injured,
+        number_of_pedestrians_injured,
+        number_of_cyclist_killed,
+        number_of_pedestrians_killed,
+        vehicle_type_code_1,
+        vehicle_type_code_2,
+        vehicle_type_code_3,
+        vehicle_type_code_4,
+        vehicle_type_code_5
+    FROM collisions
+    WHERE crash_date >= '2024-01-01' AND crash_date < '2025-01-01'
+),
+bike_crashes AS (
+    SELECT 
+        borough,
+        COUNT(*) AS bike_accidents,
+        SUM(
+            CASE 
+                WHEN number_of_persons_injured >= 1 OR number_of_cyclist_injured >= 1 OR number_of_pedestrians_injured >= 1 
+                THEN 1 ELSE 0 
+            END
+        ) AS injured_bike_accidents,
+        SUM(
+            CASE 
+                WHEN number_of_cyclist_killed >= 1 OR number_of_pedestrians_killed >= 1 
+                THEN 1 ELSE 0 
+            END
+        ) AS fatal_bike_accidents
+    FROM bike_collisions
+    WHERE 
+        vehicle_type_code_1 IN {bike_tuple} OR
+        vehicle_type_code_2 IN {bike_tuple} OR
+        vehicle_type_code_3 IN {bike_tuple} OR
+        vehicle_type_code_4 IN {bike_tuple} OR
+        vehicle_type_code_5 IN {bike_tuple}
+    GROUP BY borough
+)
+SELECT 
+    borough,
+    bike_accidents,
+    injured_bike_accidents,
+    fatal_bike_accidents,
+    ROUND(injured_bike_accidents::decimal / NULLIF(bike_accidents, 0), 4) AS injured_share,
+    ROUND(fatal_bike_accidents::decimal / NULLIF(bike_accidents, 0), 4) AS fatal_share
+FROM 
+    bike_crashes
+ORDER BY 
+    bike_accidents DESC;
 """
 
 temp = pd.read_sql(query, engine)
 print(temp)
-
