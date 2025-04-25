@@ -11,46 +11,66 @@ from shapely import wkt
 csv_path = r"02_analysis\subroutines\input\map_nyc\Modified_Zip_Code_Tabulation_Areas__MODZCTA__20250425.csv"
 
 #%% Load the CSV
-df = pd.read_csv(csv_path)
+def plot_zip_map(
+        csv_path: str,
+        zip_codes: list,
+        values: list,
+        output_name: str,
+        zip_column: str = "MODZCTA",
+        value_label: str = "value"
+):
+    """
+    Plot a choropleth map of NYC zip code areas based on a CSV with geometry.
 
-# Try to detect if a WKT-style geometry column exists
-geometry_col = None
-for col in df.columns:
-    if df[col].astype(str).str.startswith('MULTI').any() or df[col].astype(str).str.startswith('POLYGON').any():
-        geometry_col = col
-        break
+    Parameters:
+    - csv_path: Path to CSV with zip geometries.
+    - zip_codes: List of zip codes to color.
+    - values: List of values to use for color scale.
+    - output_path: Path to save the output PNG.
+    - zip_column: Column in the CSV corresponding to ZIP codes.
+    - value_label: Name of the value column (for legend).
+    """
 
-if geometry_col:
-    # If WKT geometry exists, convert to GeoDataFrame
+    # Load CSV
+    df = pd.read_csv(csv_path)
+    df[value_label] = pd.NA
+    output_path = f"02_analysis/plots/{output_name}.png",
+
+    # Detect WKT geometry column
+    geometry_col = None
+    for col in df.columns:
+        if df[col].astype(str).str.startswith('MULTI').any() or df[col].astype(str).str.startswith('POLYGON').any():
+            geometry_col = col
+            break
+
+    if not geometry_col:
+        raise ValueError("No WKT geometry column found in CSV.")
+
+    # Convert geometry
     df[geometry_col] = df[geometry_col].apply(wkt.loads)
     gdf = gpd.GeoDataFrame(df, geometry=df[geometry_col], crs="EPSG:4326")
-else:
-    # If no geometry, fall back to lat/lng columns
-    lat_col = next((c for c in df.columns if 'lat' in c.lower()), None)
-    lon_col = next((c for c in df.columns if 'lon' in c.lower() or 'lng' in c.lower()), None)
 
-    if lat_col is None or lon_col is None:
-        raise ValueError("Could not find geometry or lat/lon columns in the CSV.")
+    # Merge with provided values
+    zip_value_df = pd.DataFrame({zip_column: zip_codes, value_label: values})
+    merged = gdf.merge(zip_value_df, on=zip_column, how="left")
 
-    gdf = gpd.GeoDataFrame(
-        df,
-        geometry=gpd.points_from_xy(df[lon_col], df[lat_col]),
-        crs="EPSG:4326"
+    # Create output folder
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    # Plot with color scale
+    ax = merged.plot(
+        column=value_label,
+        cmap="viridis",
+        figsize=(10, 10),
+        edgecolor="black",
+        legend=True,
+        missing_kwds={"color": "lightgrey", "label": "No data"}
     )
 
-# Save the map to plots folder
-plot_path = r"02_analysis\plots\nyc_map_from_csv.png"
-os.makedirs(os.path.dirname(plot_path), exist_ok=True)
+    plt.title("NYC Zip Code Map (colored by value)")
+    plt.axis('off')
+    plt.savefig(output_path, bbox_inches='tight', dpi=300)
+    plt.close()
 
-gdf.plot(figsize=(10, 10), edgecolor='black')
-plt.title("NYC Map from CSV Geometry")
-plt.axis('off')
-plt.savefig(plot_path, bbox_inches='tight', dpi=300)
-plt.close()
-
-print(f"🖼️ Map saved to: {plot_path}")
-
-#%%
-import os
-print(os.getcwd())
+    print(f"🖼️ Map saved to: {output_path}")
 
