@@ -97,14 +97,11 @@ for i, chunk in enumerate(chunks, start=1):
         problematic_chunks.append(i)
         continue
 
-print("✅ All chunks loaded.")
+print("All chunks loaded.")
 if problematic_chunks:
-    print(f"⚠️ The following chunks failed and were skipped: {problematic_chunks}")
-    with open("problematic_chunks.txt", "w") as f:
-        for idx in problematic_chunks:
-            f.write(f"{idx}\n")
+    print(f"The following chunks failed and were skipped: {problematic_chunks}")
 else:
-    print("✅ No problematic chunks.")
+    print("No problematic chunks.")
 
 
 
