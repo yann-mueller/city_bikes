@@ -8,7 +8,6 @@ from sqlalchemy import create_engine
 # Database connection
 engine = create_engine("postgresql://postgres:axa_datascience@localhost:5432/citibike")
 
-
 #%% Column type information
 query = """
 SELECT 
@@ -29,13 +28,11 @@ print(temp)
 temp = pd.read_sql("SELECT COUNT(DISTINCT start_station_id) AS unique_start_stations FROM trips", con=engine)
 print(temp)
 
-
-
-#%%
+#%% Number of observations
 temp = pd.read_sql("SELECT COUNT(*) AS total_rows FROM trips", con=engine)
 print(temp)
 
-#%% Rides per Month
+#%% Rides per month
 query = """
 SELECT 
     DATE_TRUNC('month', started_at::timestamp) AS month,
@@ -65,18 +62,16 @@ plt.yticks(fontsize=14)
 
 plt.tight_layout()
 
-# Save
 plt.savefig("02_analysis/plots/monthly_rides_2024.png")
 
-
-#%%
+#%% Check first and last ride
 temp = pd.read_sql("""
     SELECT MIN(started_at) AS first_ride, MAX(started_at) AS last_ride
     FROM trips
 """, con=engine)
 print(temp)
 
-#%%
+#%% Top 10 stations
 temp = pd.read_sql("""
     SELECT start_station_name, COUNT(*) AS ride_count
     FROM trips
@@ -86,7 +81,7 @@ temp = pd.read_sql("""
 """, con=engine)
 print(temp)
 
-#%%
+#%% Overview member status
 temp = pd.read_sql("""
     SELECT member_casual, COUNT(*) AS num_rides
     FROM trips
