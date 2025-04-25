@@ -32,7 +32,7 @@ print(temp)
 temp = pd.read_sql("SELECT COUNT(*) AS total_rows FROM trips", con=engine)
 print(temp)
 
-#%% Rides per month
+#%% Rides per month & Plot
 query = """
 SELECT 
     DATE_TRUNC('month', started_at::timestamp) AS month,
@@ -45,6 +45,7 @@ ORDER BY month;
 
 temp = pd.read_sql(query, engine)
 print(temp)
+
 # Plot: Rides per Month
 temp['month_label'] = temp['month'].dt.strftime('%B')  # e.g., "January"
 temp['num_rides_millions'] = temp['num_rides'] / 1_000_000
@@ -57,7 +58,8 @@ plt.xlabel("Monat", fontsize=16)
 plt.ylabel("Anzahl Fahrten (in Millionen)", fontsize=16, labelpad=15)
 plt.title("Monatliche CitiBike Fahrten – 2024", fontsize=18, pad=20)
 
-plt.xticks(fontsize=14)
+# Rotate x-axis labels for readability
+plt.xticks(rotation=45, fontsize=14, ha='right')
 plt.yticks(fontsize=14)
 
 plt.tight_layout()
