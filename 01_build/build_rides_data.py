@@ -80,20 +80,21 @@ for ZIP_URL in ZIP_URLS:
             num_params = chunk.notna().sum().sum()
             print(f"Chunk {i}/{total_chunks} → Parameters: {num_params}")
 
-            # Remove any 'unnamed' columns that sneak in from CSV index
-            chunk = chunk.loc[:, ~chunk.columns.str.contains("^unnamed", case=False)]
-
-            # Normalize column names
+            # Normalize column names (do this first so we can match correct column names below)
             chunk.columns = [col.lower().strip().replace(" ", "_") for col in chunk.columns]
 
-            # Enforce types for start/end time
+            # Remove any 'unnamed' columns that sneak in from CSV index, and make a fresh copy to avoid SettingWithCopyWarning
+            chunk = chunk.loc[:, ~chunk.columns.str.contains("^unnamed", case=False)].copy()
+
+            # Enforce datetime conversion
             chunk['started_at'] = pd.to_datetime(chunk['started_at'], errors='coerce')
             chunk['ended_at'] = pd.to_datetime(chunk['ended_at'], errors='coerce')
 
-            # Explicitly convert columns 5 and 7 (0-based index) to strings
-            if len(chunk.columns) > 7:  # make sure the columns exist
-                chunk.iloc[:, 5] = chunk.iloc[:, 5].astype(str)
-                chunk.iloc[:, 7] = chunk.iloc[:, 7].astype(str)
+            # Explicitly convert columns 5 and 7 (0-based index) to string safely using .loc and column names
+            col_list = chunk.columns.tolist()
+            if len(col_list) > 7:
+                chunk.loc[:, col_list[5]] = chunk[col_list[5]].astype(str)
+                chunk.loc[:, col_list[7]] = chunk[col_list[7]].astype(str)
 
             # Append to database
             try:
