@@ -16,7 +16,8 @@ def plot_zip_map(
         csv_path: str = "02_analysis/subroutines/input/map_nyc/Modified_Zip_Code_Tabulation_Areas_MODZCTA_20250425.csv",
         zip_column: str = "MODZCTA",
         value_label: str = "value",
-        plot_title: str = "NYC Zip Code Map (colored by value)"
+        plot_title: str = "NYC Zip Code Map (colored by value)",
+        legend_label: str = "Value"
 ):
     """
     Plot a choropleth map of NYC zip code areas based on a CSV with geometry.
@@ -72,7 +73,7 @@ def plot_zip_map(
 
     # Adjust colorbar
     cbar = color_map.get_figure().get_axes()[-1]
-    cbar.set_ylabel(value_label, fontsize=14)
+    cbar.set_ylabel(legend_label, fontsize=14)
     cbar.tick_params(labelsize=12)
 
     # Shrink colorbar height by 50%
