@@ -42,6 +42,9 @@ print(f"Loading {FILENAME} into PostgreSQL database 'nypd' in chunks...")
 chunks = pd.read_csv(FILE_PATH, chunksize=chunksize, low_memory=False)
 total_chunks = sum(1 for _ in pd.read_csv(FILE_PATH, chunksize=chunksize, low_memory=False))  # for progress display
 
+# List of chunks that created problems and could not load into the database
+problematic_chunks = []
+
 for i, chunk in enumerate(chunks, start=1):
     num_params = chunk.notna().sum().sum()
     print(f"Chunk {i}/{total_chunks} → Parameters: {num_params}")
@@ -56,27 +59,54 @@ for i, chunk in enumerate(chunks, start=1):
     if "crash_time" in chunk.columns:
         chunk["crash_time"] = pd.to_datetime(chunk["crash_time"], format="%H:%M", errors='coerce')
 
-    # Filter for year 2024 only (Observations for some earlier years made problems and are not needed anyways right now)
+    # Filter for year 2010–2024
     if "crash_date" in chunk.columns:
-        chunk = chunk[chunk["crash_date"].dt.year >= 2010]
-        print(f"Keeping {len(chunk)} rows from years > 2010")
+        chunk = chunk[(chunk["crash_date"].dt.year >= 2010) & (chunk["crash_date"].dt.year <= 2024)].copy()
+        print(f"Keeping {len(chunk)} rows from years 2010 to 2024")
 
-    # Skip insert if chunk is now empty
+    # Skip empty chunks
     if chunk.empty:
-        print(f"Chunk {i} had no >2010 entries, skipping.")
+        print(f"Chunk {i} had no valid rows, skipping.")
         continue
 
-    # Insert into database (table name = collisions)
+    # Columns that must be numeric
+    numeric_cols = [
+        "number_of_persons_injured", "number_of_persons_killed",
+        "number_of_pedestrians_injured", "number_of_pedestrians_killed",
+        "number_of_cyclist_injured", "number_of_cyclist_killed",
+        "number_of_motorist_injured", "number_of_motorist_killed",
+        "latitude", "longitude"
+    ]
+
+    # Clean numeric columns
+    chunk[numeric_cols] = chunk[numeric_cols].replace(r'^\s*$', pd.NA, regex=True)
+    chunk[numeric_cols] = chunk[numeric_cols].apply(pd.to_numeric, errors='coerce')
+    chunk.dropna(subset=numeric_cols, inplace=True)
+
+    if chunk.empty:
+        print(f"Chunk {i} had no valid numeric rows, skipping.")
+        continue
+
+    # Insert into DB
     try:
         chunk.to_sql("collisions", engine, if_exists="append", index=False, method="multi")
     except Exception as e:
         print(f"Chunk {i} failed! Params: {num_params}, shape: {chunk.shape}")
         print(e)
-        # Save for debugging
         chunk.to_csv(f"debug_failed_chunk_{i}.csv", index=False)
-        break
+        problematic_chunks.append(i)
+        continue
 
-print("All chunks loaded.")
+print("✅ All chunks loaded.")
+if problematic_chunks:
+    print(f"⚠️ The following chunks failed and were skipped: {problematic_chunks}")
+    with open("problematic_chunks.txt", "w") as f:
+        for idx in problematic_chunks:
+            f.write(f"{idx}\n")
+else:
+    print("✅ No problematic chunks.")
+
+
 
 
 #%% Cleanup
