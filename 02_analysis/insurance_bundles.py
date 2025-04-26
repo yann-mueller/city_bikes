@@ -195,9 +195,9 @@ sns.regplot(
 )
 
 # Labels and title
-plt.xlabel("Niederschlag (mm)", fontsize=14)
-plt.ylabel("Unfälle pro Fahrt", fontsize=14)
-plt.title("Zusammenhang zwischen Regen und Unfallrate (2024)", fontsize=16)
+plt.xlabel("Täglicher Niederschlag (mm)", fontsize=14)
+plt.ylabel("Unfälle pro 10.000 Fahrten", fontsize=14)
+plt.title("Unfallrate und Niederschlag (2024)", fontsize=16)
 
 plt.grid(True, linestyle='--', alpha=0.5)
 plt.xlim(left=0)
@@ -223,9 +223,9 @@ sns.regplot(
 )
 
 # Labels and title
-plt.xlabel("Max. Windgeschwindigkeit (kmh)", fontsize=14)
-plt.ylabel("Unfälle pro Fahrt", fontsize=14)
-plt.title("Zusammenhang zwischen Windgeschwindigkeit und Unfallrate (2024)", fontsize=16)
+plt.xlabel("Tägliche Max. Windgeschwindigkeit (kmh)", fontsize=14)
+plt.ylabel("Unfälle pro 10.000 Fahrten", fontsize=14)
+plt.title("Unfallrate und Windgeschwindigkeit (2024)", fontsize=16)
 
 plt.grid(True, linestyle='--', alpha=0.5)
 plt.xlim(left=0)
@@ -251,12 +251,12 @@ sns.regplot(
 )
 
 # Labels and title
-plt.xlabel("Min. Temperatur (°C)", fontsize=14)
-plt.ylabel("Unfälle pro Fahrt", fontsize=14)
-plt.title("Zusammenhang zwischen Temperatur und Unfallrate (2024)", fontsize=16)
+plt.xlabel("Tägliche Min. Temperatur (°C)", fontsize=14)
+plt.ylabel("Unfälle pro 10.000 Fahrten", fontsize=14)
+plt.title("Unfallrate und Temperatur (2024)", fontsize=16)
 
 plt.grid(True, linestyle='--', alpha=0.5)
-plt.xlim(left=0)
+#plt.xlim(left=0)
 
 # Save
 plt.tight_layout()
