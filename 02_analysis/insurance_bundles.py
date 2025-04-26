@@ -1,5 +1,8 @@
 import requests
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.stats import linregress
 from datetime import datetime
 from sqlalchemy import create_engine
 
@@ -91,3 +94,31 @@ df['num_accidents'] = df['num_accidents'].fillna(0).astype(int)
 
 # Create Accidents/Ride column
 df['accidents_per_ride'] = df['num_accidents'] / df['num_rides']
+
+#%% Scatterplot
+# Scatter Plot
+plt.figure(figsize=(8, 6))
+plt.scatter(df['precipitation_sum_mm'], df['accidents_per_ride'], alpha=0.7)
+
+# Regression
+sns.regplot(
+    x='precipitation_sum_mm',
+    y='accidents_per_ride',
+    data=df,
+    scatter=False,     # Don't double-plot scatter points
+    ci=95,              # 95% confidence interval
+    color='red',
+    line_kws={'label': 'Lineare Regression'}
+)
+
+# Labels and title
+plt.xlabel("Niederschlag (mm)", fontsize=14)
+plt.ylabel("Unfälle pro Fahrt", fontsize=14)
+plt.title("Zusammenhang zwischen Regen und Unfallrate (2024)", fontsize=16)
+
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.xlim(left=0)
+
+# Save
+plt.tight_layout()
+plt.savefig("02_analysis/plots/scatter_precipitation_accidents_per_ride.png")
