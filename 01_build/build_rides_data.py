@@ -4,23 +4,25 @@ import requests
 import zipfile
 import pandas as pd
 import shutil
+import geopandas as gpd
+from shapely import wkt
 from sqlalchemy import create_engine, text
 #%%
 # Configuration
 # URLs of the 2024 data
 ZIP_URLS = [
-    #"https://s3.amazonaws.com/tripdata/202401-citibike-tripdata.csv.zip",
-    #"https://s3.amazonaws.com/tripdata/202402-citibike-tripdata.csv.zip",
-    #"https://s3.amazonaws.com/tripdata/202403-citibike-tripdata.csv.zip",
-    #"https://s3.amazonaws.com/tripdata/202404-citibike-tripdata.csv.zip",
-    #"https://s3.amazonaws.com/tripdata/202405-citibike-tripdata.zip",
-    #"https://s3.amazonaws.com/tripdata/202406-citibike-tripdata.zip",
-    #"https://s3.amazonaws.com/tripdata/202407-citibike-tripdata.zip",
-    #"https://s3.amazonaws.com/tripdata/202408-citibike-tripdata.zip",
-    #"https://s3.amazonaws.com/tripdata/202409-citibike-tripdata.zip",
+    "https://s3.amazonaws.com/tripdata/202401-citibike-tripdata.csv.zip",
+    "https://s3.amazonaws.com/tripdata/202402-citibike-tripdata.csv.zip",
+    "https://s3.amazonaws.com/tripdata/202403-citibike-tripdata.csv.zip",
+    "https://s3.amazonaws.com/tripdata/202404-citibike-tripdata.csv.zip",
+    "https://s3.amazonaws.com/tripdata/202405-citibike-tripdata.zip",
+    "https://s3.amazonaws.com/tripdata/202406-citibike-tripdata.zip",
+    "https://s3.amazonaws.com/tripdata/202407-citibike-tripdata.zip",
+    "https://s3.amazonaws.com/tripdata/202408-citibike-tripdata.zip",
+    "https://s3.amazonaws.com/tripdata/202409-citibike-tripdata.zip",
     "https://s3.amazonaws.com/tripdata/202410-citibike-tripdata.zip",
-    #"https://s3.amazonaws.com/tripdata/202411-citibike-tripdata.zip",
-    #"https://s3.amazonaws.com/tripdata/202412-citibike-tripdata.zip"
+    "https://s3.amazonaws.com/tripdata/202411-citibike-tripdata.zip",
+    "https://s3.amazonaws.com/tripdata/202412-citibike-tripdata.zip"
 ]
 
 DEST_DIR = "./99_temp"
@@ -43,6 +45,7 @@ with engine.connect() as conn:
     """))
     db_columns = [row[0] for row in result]
 
+#%%
 # Ensure temp directory exists
 os.makedirs(DEST_DIR, exist_ok=True)
 
@@ -167,4 +170,20 @@ with engine.begin() as conn:
     conn.execute(text("CREATE INDEX idx_ride_id ON trips(ride_id);"))
 
     print("Duplications removed and table updated.")
+
+#%% Add ZIP codes to every observation
+csv_path = "02_analysis/subroutines/input/map_nyc/Modified_Zip_Code_Tabulation_Areas_MODZCTA_20250425.csv"
+df = pd.read_csv(csv_path)
+
+# Detect WKT geometry column
+geometry_col = None
+for col in df.columns:
+    if df[col].astype(str).str.startswith('MULTI').any() or df[col].astype(str).str.startswith('POLYGON').any():
+        geometry_col = col
+        break
+if not geometry_col:
+    raise ValueError("No WKT geometry column found in CSV.")
+
+df[geometry_col] = df[geometry_col].apply(wkt.loads)
+gdf = gpd.GeoDataFrame(df, geometry=df[geometry_col], crs="EPSG:4326")
 
