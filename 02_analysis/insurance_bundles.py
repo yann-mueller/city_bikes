@@ -205,6 +205,7 @@ plt.xlim(left=0)
 # Save
 plt.tight_layout()
 plt.savefig("02_analysis/plots/scatter_precipitation_accidents_per_ride.png")
+plt.close()
 
 #%% Scatterplot Windspeed
 # Scatter Plot
@@ -233,6 +234,7 @@ plt.xlim(left=0)
 # Save
 plt.tight_layout()
 plt.savefig("02_analysis/plots/scatter_wind_accidents_per_ride.png")
+plt.close()
 
 #%% Scatterplot Temperature
 # Scatter Plot
@@ -261,6 +263,35 @@ plt.grid(True, linestyle='--', alpha=0.5)
 # Save
 plt.tight_layout()
 plt.savefig("02_analysis/plots/scatter_temperature_accidents_per_ride.png")
+plt.close()
+
+#%% Plot Snowfall
+# Snow-day dummy column
+df['snow_day'] = df['snowfall_sum_cm'] > 0
+
+# Group by snow_day
+grouped = df.groupby('snow_day')['accidents_per_ride'].mean().reset_index()
+
+# Map True/False to nicer labels
+grouped['snow_label'] = grouped['snow_day'].map({True: 'Mit Schnee', False: 'Ohne Schnee'})
+
+# Plot
+plt.figure(figsize=(8, 6))
+plt.bar(grouped['snow_label'], grouped['accidents_per_ride'], width=0.6)
+
+plt.xlabel("Tagestyp", fontsize=14)
+plt.ylabel("Ø Unfälle pro 10.000 Fahrten", fontsize=14)
+plt.title("Unfallrate an Tagen mit und ohne Schnee (2024)", fontsize=16)
+
+for index, value in enumerate(grouped['accidents_per_ride']):
+    plt.text(index, value + 0.05, f"{value:.2f}", ha='center', va='bottom', fontsize=12)
+
+plt.grid(axis='y', linestyle='--', alpha=0.5)
+
+plt.tight_layout()
+
+plt.savefig("02_analysis/plots/bar_accidents_per_ride_snow_vs_no_snow.png")
+plt.close()
 
 
 ####################################
@@ -348,3 +379,4 @@ plt.grid(axis='y', linestyle='--', alpha=0.5)
 plt.tight_layout()
 
 plt.savefig("02_analysis/plots/accidents_per_ride_time_slot.png")
+plt.close()
