@@ -297,3 +297,24 @@ df_time_slots['time_slot_label'] = df_time_slots['time_slot'].apply(lambda x: f"
 # Sort by time slot
 df_time_slots = df_time_slots.sort_values('time_slot')
 
+# Accidents per 10.000 rides
+df_time_slots['accidents_per_ride'] = df_time_slots['accidents_per_ride'] * 100000
+
+#%% Plot: Accidents/Ride per Time Slot
+# Bar Chart: Accidents per Ride by 3-Hour Time Slot
+plt.figure(figsize=(10, 6))
+plt.bar(df_time_slots['time_slot_label'], df_time_slots['accidents_per_ride'], width=0.6)
+
+# Labels and Title
+plt.xlabel("Zeitfenster", fontsize=14, labelpad=10)
+plt.ylabel("Unfälle pro 10.000 Fahrten", fontsize=14)
+plt.title("Unfallrate per 3-Stunden-Fenster (2024)", fontsize=16)
+
+plt.xticks(rotation=45, ha='right', fontsize=12)
+plt.yticks(fontsize=12)
+
+plt.grid(axis='y', linestyle='--', alpha=0.5)
+
+plt.tight_layout()
+
+plt.savefig("02_analysis/plots/accidents_per_ride_time_slot.png")
