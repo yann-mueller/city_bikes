@@ -7,12 +7,15 @@ from datetime import datetime
 from sqlalchemy import create_engine
 
 
-# NY coordinates
+##############################################
+### Accidents/Ride per Precipitation Level ###
+##############################################
+
+#%% NY coordinates
 latitude = 40.7128
 longitude = -74.0060
 
-
-#%% Download weather data from Open-Meteo
+# Download weather data from Open-Meteo
 # API URL
 url = f"https://archive-api.open-meteo.com/v1/archive?latitude={latitude}&longitude={longitude}&start_date=2024-01-01&end_date=2024-12-31&daily=precipitation_sum&timezone=America/New_York"
 
@@ -122,3 +125,38 @@ plt.xlim(left=0)
 # Save
 plt.tight_layout()
 plt.savefig("02_analysis/plots/scatter_precipitation_accidents_per_ride.png")
+
+#%% Scatterplot Percentiles
+# Calculate percentiles
+df['precipitation_percentile'] = df['precipitation_sum_mm'].rank(pct=True)
+df['accidents_per_ride_percentile'] = df['accidents_per_ride'].rank(pct=True)
+
+# Plot
+plt.figure(figsize=(8, 6))
+plt.scatter(df['precipitation_percentile'], df['accidents_per_ride_percentile'], alpha=0.7)
+
+# Regression
+sns.regplot(
+    x='precipitation_percentile',
+    y='accidents_per_ride_percentile',
+    data=df,
+    scatter=False,
+    ci=95,
+    color='red',
+    line_kws={'label': 'Lineare Regression'}
+)
+
+# Labels and title
+plt.xlabel("Niederschlags-Perzentil", fontsize=14)
+plt.ylabel("Unfallrate-Perzentil", fontsize=14)
+plt.title("Zusammenhang zwischen Regen und Unfallrate (Perzentile)", fontsize=16)
+
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.xlim(0, 1)
+plt.ylim(0, 1)
+plt.legend()
+
+plt.tight_layout()
+plt.savefig("02_analysis/plots/scatter__precipitation_accidents_percentile.png")
+
+
