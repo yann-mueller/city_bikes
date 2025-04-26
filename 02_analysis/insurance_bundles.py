@@ -2,6 +2,7 @@ import requests
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 from scipy.stats import linregress
 from datetime import datetime
 from sqlalchemy import create_engine
@@ -272,19 +273,27 @@ df['snow_day'] = df['snowfall_sum_cm'] > 0
 # Group by snow_day
 grouped = df.groupby('snow_day')['accidents_per_ride'].mean().reset_index()
 
-# Map True/False to nicer labels
+# Add readable labels
 grouped['snow_label'] = grouped['snow_day'].map({True: 'Mit Schnee', False: 'Ohne Schnee'})
+
+# Change order
+x_pos = np.array([-1, 1])
+grouped = grouped.sort_values('snow_day', ascending=False).reset_index(drop=True)
 
 # Plot
 plt.figure(figsize=(8, 6))
-plt.bar(grouped['snow_label'], grouped['accidents_per_ride'], width=0.6)
+plt.bar(x_pos, grouped['accidents_per_ride'], width=0.4, color="#1f77b4")  # Achtung: hier x_pos statt grouped['snow_label']
 
-plt.xlabel("Tagestyp", fontsize=14)
+plt.xlim(-2, 2)
+plt.xticks(ticks=x_pos, labels=grouped['snow_label'], fontsize=12)
+
+plt.xlabel("Tagestyp", fontsize=14, labelpad=10)
 plt.ylabel("Ø Unfälle pro 10.000 Fahrten", fontsize=14)
 plt.title("Unfallrate an Tagen mit und ohne Schnee (2024)", fontsize=16)
 
 for index, value in enumerate(grouped['accidents_per_ride']):
-    plt.text(index, value + 0.05, f"{value:.2f}", ha='center', va='bottom', fontsize=12)
+    plt.text(x_pos[index], value / 2, f"{value:.2f}", ha='center', va='center',
+             color='white', fontsize=13, fontweight='bold')
 
 plt.grid(axis='y', linestyle='--', alpha=0.5)
 
