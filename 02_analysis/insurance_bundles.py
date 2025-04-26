@@ -79,15 +79,23 @@ longitude = -74.0060
 
 # Download weather data from Open-Meteo
 # API URL
-url = f"https://archive-api.open-meteo.com/v1/archive?latitude={latitude}&longitude={longitude}&start_date=2024-01-01&end_date=2024-12-31&daily=precipitation_sum&timezone=America/New_York"
+url = f"https://archive-api.open-meteo.com/v1/archive?" \
+      f"latitude={latitude}&longitude={longitude}" \
+      f"&start_date=2024-01-01&end_date=2024-12-31" \
+      f"&daily=precipitation_sum,temperature_2m_max,temperature_2m_min,snowfall_sum,windspeed_10m_max" \
+      f"&timezone=America/New_York"
 
 # API request
 response = requests.get(url)
 data = response.json()
 
 df = pd.DataFrame({
-    "date": data["daily"]["time"],
-    "precipitation_sum_mm": data["daily"]["precipitation_sum"]
+    "date": pd.to_datetime(data["daily"]["time"]),
+    "precipitation_sum_mm": data["daily"]["precipitation_sum"],
+    "temperature_max_c": data["daily"]["temperature_2m_max"],
+    "temperature_min_c": data["daily"]["temperature_2m_min"],
+    "snowfall_sum_cm": data["daily"]["snowfall_sum"],
+    "windspeed_max_kmh": data["daily"]["windspeed_10m_max"]
 })
 
 #%% Add Rides per Day
