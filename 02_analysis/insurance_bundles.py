@@ -237,5 +237,63 @@ plt.savefig("02_analysis/plots/scatter__precipitation_accidents_percentile.png")
 ### Accidents/Ride per Time Slot ###
 ####################################
 
+#%% Database connection
+engine = create_engine("postgresql://postgres:axa_datascience@localhost:5432/citibike")
 
+# Query rides per 3-hour slot
+temp = pd.read_sql("""
+    SELECT 
+        FLOOR(EXTRACT(hour FROM started_at::timestamp) / 3) * 3 AS time_slot,
+        COUNT(*) AS num_rides
+    FROM trips
+    WHERE DATE_PART('year', started_at::timestamp) = 2024
+    GROUP BY time_slot
+    ORDER BY time_slot;
+""", con=engine)
+
+# Prepare rides df
+df_time_slots = temp.copy()
+
+#%% Bike Accidents per 3-Hour Slot
+# Database connection
+engine = create_engine("postgresql://postgres:axa_datascience@localhost:5432/nypd")
+
+# Query bike accidents per 3-hour slot
+temp = pd.read_sql(f"""
+    SELECT 
+        FLOOR(EXTRACT(hour FROM crash_time::time) / 3) * 3 AS time_slot,
+        COUNT(*) AS num_bike_accidents
+    FROM collisions
+    WHERE crash_date >= '2024-01-01' 
+      AND crash_date < '2025-01-01'
+      AND (
+          vehicle_type_code_1 IN {bike_tuple} OR
+          vehicle_type_code_2 IN {bike_tuple} OR
+          vehicle_type_code_3 IN {bike_tuple} OR
+          vehicle_type_code_4 IN {bike_tuple} OR
+          vehicle_type_code_5 IN {bike_tuple}
+      )
+    GROUP BY time_slot
+    ORDER BY time_slot;
+""", con=engine)
+
+# Merge bike accidents into rides df
+df_time_slots = df_time_slots.merge(
+    temp,
+    how='left',
+    left_on='time_slot',
+    right_on='time_slot'
+)
+
+# Fill missing accident slots with 0
+df_time_slots['num_bike_accidents'] = df_time_slots['num_bike_accidents'].fillna(0).astype(int)
+
+# Create accidents per ride
+df_time_slots['accidents_per_ride'] = df_time_slots['num_bike_accidents'] / df_time_slots['num_rides']
+
+# Optional: Create readable label for time slots
+df_time_slots['time_slot_label'] = df_time_slots['time_slot'].apply(lambda x: f"{str(int(x)).zfill(2)}:00–{str((int(x)+3)%24).zfill(2)}:00")
+
+# Sort by time slot
+df_time_slots = df_time_slots.sort_values('time_slot')
 
