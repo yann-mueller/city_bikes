@@ -205,7 +205,7 @@ plt.figure(figsize=(8, 6))
 plt.scatter(df['precipitation_percentile'], df['accidents_per_ride_percentile'], alpha=0.7)
 
 # Regression
-sns.regplot(
+reg_line = sns.regplot(
     x='precipitation_percentile',
     y='accidents_per_ride_percentile',
     data=df,
@@ -214,6 +214,10 @@ sns.regplot(
     color='red',
     line_kws={'label': 'Lineare Regression'}
 )
+
+# Manually add label to the regression line
+reg_line.lines[0].set_label('Lineare Regression')
+
 
 # Labels and title
 plt.xlabel("Niederschlags-Perzentil", fontsize=14)
