@@ -129,12 +129,20 @@ df['num_rides'] = df['num_rides'].fillna(0).astype(int)
 engine = create_engine("postgresql://postgres:axa_datascience@localhost:5432/nypd")
 
 # Query accidents per day
-temp = pd.read_sql("""
+temp = pd.read_sql(f"""
     SELECT 
         crash_date AS accident_date,
-        COUNT(*) AS num_accidents
+        COUNT(*) AS num_bike_accidents
     FROM collisions
-    WHERE crash_date >= '2024-01-01' AND crash_date < '2025-01-01'
+    WHERE crash_date >= '2024-01-01' 
+      AND crash_date < '2025-01-01'
+      AND (
+          vehicle_type_code_1 IN {bike_tuple} OR
+          vehicle_type_code_2 IN {bike_tuple} OR
+          vehicle_type_code_3 IN {bike_tuple} OR
+          vehicle_type_code_4 IN {bike_tuple} OR
+          vehicle_type_code_5 IN {bike_tuple}
+      )
     GROUP BY crash_date
     ORDER BY crash_date;
 """, con=engine)
@@ -154,10 +162,10 @@ df = df.merge(
 df = df.drop(columns=['accident_date'])
 
 # Fill missing accident days with 0
-df['num_accidents'] = df['num_accidents'].fillna(0).astype(int)
+df['num_bike_accidents'] = df['num_bike_accidents'].fillna(0).astype(int)
 
 # Create Accidents/Ride column
-df['accidents_per_ride'] = df['num_accidents'] / df['num_rides']
+df['accidents_per_ride'] = df['num_bike_accidents'] / df['num_rides']
 
 #%% Scatterplot
 # Scatter Plot
