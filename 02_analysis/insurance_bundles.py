@@ -175,7 +175,7 @@ df['num_bike_accidents'] = df['num_bike_accidents'].fillna(0).astype(int)
 # Create Accidents/Ride column
 df['accidents_per_ride'] = df['num_bike_accidents'] / df['num_rides']
 
-#%% Scatterplot
+#%% Scatterplot Precipitation
 # Scatter Plot
 plt.figure(figsize=(8, 6))
 plt.scatter(df['precipitation_sum_mm'], df['accidents_per_ride'], alpha=0.7)
@@ -203,42 +203,33 @@ plt.xlim(left=0)
 plt.tight_layout()
 plt.savefig("02_analysis/plots/scatter_precipitation_accidents_per_ride.png")
 
-#%% Scatterplot Percentiles
-# Calculate percentiles
-df['precipitation_percentile'] = df['precipitation_sum_mm'].rank(pct=True)
-df['accidents_per_ride_percentile'] = df['accidents_per_ride'].rank(pct=True)
-
-# Plot
+#%% Scatterplot Windspeed
+# Scatter Plot
 plt.figure(figsize=(8, 6))
-plt.scatter(df['precipitation_percentile'], df['accidents_per_ride_percentile'], alpha=0.7)
+plt.scatter(df['windspeed_max_kmh'], df['accidents_per_ride'], alpha=0.7)
 
 # Regression
-reg_line = sns.regplot(
-    x='precipitation_percentile',
-    y='accidents_per_ride_percentile',
+sns.regplot(
+    x='windspeed_max_kmh',
+    y='accidents_per_ride',
     data=df,
-    scatter=False,
-    ci=95,
+    scatter=False,     # Don't double-plot scatter points
+    ci=95,              # 95% confidence interval
     color='red',
     line_kws={'label': 'Lineare Regression'}
 )
 
-# Manually add label to the regression line
-reg_line.lines[0].set_label('Lineare Regression')
-
-
 # Labels and title
-plt.xlabel("Niederschlags-Perzentil", fontsize=14)
-plt.ylabel("Unfallrate-Perzentil", fontsize=14)
-plt.title("Zusammenhang zwischen Regen und Unfallrate (Perzentile)", fontsize=16)
+plt.xlabel("Max. Windgeschwindigkeit (kmh)", fontsize=14)
+plt.ylabel("Unfälle pro Fahrt", fontsize=14)
+plt.title("Zusammenhang zwischen Windgeschwindigkeit und Unfallrate (2024)", fontsize=16)
 
 plt.grid(True, linestyle='--', alpha=0.5)
-plt.xlim(0, 1)
-plt.ylim(0, 1)
-plt.legend()
+plt.xlim(left=0)
 
+# Save
 plt.tight_layout()
-plt.savefig("02_analysis/plots/scatter__precipitation_accidents_percentile.png")
+plt.savefig("02_analysis/plots/scatter_wind_accidents_per_ride.png")
 
 
 ####################################
