@@ -175,6 +175,8 @@ df['num_bike_accidents'] = df['num_bike_accidents'].fillna(0).astype(int)
 # Create Accidents/Ride column
 df['accidents_per_ride'] = df['num_bike_accidents'] / df['num_rides']
 
+# Accidents per 10.000 rides
+df['accidents_per_ride'] = df['accidents_per_ride'] * 10000
 
 #%% Scatterplot Precipitation
 # Scatter Plot
@@ -326,7 +328,7 @@ df_time_slots['time_slot_label'] = df_time_slots['time_slot'].apply(lambda x: f"
 df_time_slots = df_time_slots.sort_values('time_slot')
 
 # Accidents per 10.000 rides
-df_time_slots['accidents_per_ride'] = df_time_slots['accidents_per_ride'] * 100000
+df_time_slots['accidents_per_ride'] = df_time_slots['accidents_per_ride'] * 10000
 
 #%% Plot: Accidents/Ride per Time Slot
 # Bar Chart: Accidents per Ride by 3-Hour Time Slot
