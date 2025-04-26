@@ -58,3 +58,36 @@ df = df.drop(columns=['ride_date'])
 df['num_rides'] = df['num_rides'].fillna(0).astype(int)
 
 #%% Add Accidents per Day
+# Database connection
+engine = create_engine("postgresql://postgres:axa_datascience@localhost:5432/nypd")
+
+# Query accidents per day
+temp = pd.read_sql("""
+    SELECT 
+        crash_date AS accident_date,
+        COUNT(*) AS num_accidents
+    FROM collisions
+    WHERE crash_date >= '2024-01-01' AND crash_date < '2025-01-01'
+    GROUP BY crash_date
+    ORDER BY crash_date;
+""", con=engine)
+
+# Prepare accident df
+temp['accident_date'] = pd.to_datetime(temp['accident_date'])
+
+# Merge accidents into weather df
+df = df.merge(
+    temp,
+    how='left',
+    left_on='date',
+    right_on='accident_date'
+)
+
+# Drop the duplicate 'accident_date' column after merge
+df = df.drop(columns=['accident_date'])
+
+# Fill missing accident days with 0
+df['num_accidents'] = df['num_accidents'].fillna(0).astype(int)
+
+# Create Accidents/Ride column
+df['accidents_per_ride'] = df['num_accidents'] / df['num_rides']
