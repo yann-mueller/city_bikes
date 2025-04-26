@@ -7,6 +7,68 @@ from datetime import datetime
 from sqlalchemy import create_engine
 
 
+##############
+### CONFIG ###
+##############
+
+#%% Create Bike List first
+# Database connection
+engine = create_engine("postgresql://postgres:axa_datascience@localhost:5432/nypd")
+
+# Column type information
+query = """
+SELECT 
+    column_name, 
+    data_type 
+FROM 
+    information_schema.columns 
+WHERE 
+    table_name = 'collisions'
+ORDER BY 
+    ordinal_position;
+"""
+
+temp = pd.read_sql(query, engine)
+print(temp)
+
+# Unique contributing factors
+query = """
+SELECT DISTINCT vehicle_type_code_1 AS factor FROM collisions
+UNION
+SELECT DISTINCT vehicle_type_code_2 FROM collisions
+UNION
+SELECT DISTINCT vehicle_type_code_3 FROM collisions
+UNION
+SELECT DISTINCT vehicle_type_code_4 FROM collisions
+UNION
+SELECT DISTINCT vehicle_type_code_5 FROM collisions
+ORDER BY factor;
+"""
+
+temp = pd.read_sql(query, engine)
+print(temp)
+
+# Filter for vehicle types containing 'bike' or 'bicycle'
+bike_strings = temp[temp['factor'].str.contains('bike|bicycle', case=False, na=False)]
+
+# Convert to list
+bike_strings_list = bike_strings['factor'].tolist()
+
+print(bike_strings_list)
+
+# Entries to remove
+to_remove = ['Dart bike', 'dirt bike', 'Dirt Bike', 'DIRT BIKE', 'dirtbike', 'Dirtbike', 'DIRTBIKE', 'Moped bike',
+             'gas bike', 'Minibike', 'Motorbike', 'motorbike', 'PEDAL BIKE', 'Dirt Bike']
+
+# Filter the list
+bike_strings_list = [item for item in bike_strings_list if item not in to_remove]
+
+print(bike_strings_list)
+
+# Create a tuple of strings for SQL IN clause
+bike_tuple = tuple(bike_strings_list)
+
+
 ##############################################
 ### Accidents/Ride per Precipitation Level ###
 ##############################################
@@ -55,7 +117,6 @@ df = df.merge(
     left_on='date',
     right_on='ride_date'
 )
-
 
 # rop the duplicate 'ride_date' column after merge
 df = df.drop(columns=['ride_date'])
@@ -158,5 +219,11 @@ plt.legend()
 
 plt.tight_layout()
 plt.savefig("02_analysis/plots/scatter__precipitation_accidents_percentile.png")
+
+
+####################################
+### Accidents/Ride per Time Slot ###
+####################################
+
 
 
