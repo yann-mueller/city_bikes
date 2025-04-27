@@ -1,5 +1,6 @@
 ### Individual Pricing Strategy
 import os
+import json
 import requests
 import zipfile
 import pandas as pd
@@ -102,7 +103,6 @@ plt.tight_layout()
 plt.savefig("02_analysis/plots/nyc_zip_roads.png")
 plt.close()
 
-#%%
 ##################################
 ### 2D Fast Marching Algorithm ###
 ##################################
@@ -257,4 +257,209 @@ plt.title('Optimal Path via Fast Marching', fontsize=20)
 plt.tight_layout()
 plt.savefig("02_analysis/plots/path_on_raster.png")
 plt.close()
+
+#%% Assign ZIP Codes to Fastest Path
+def build_zipcode_raster(gdf_zipcodes, X, Y):
+    xmin, ymin, xmax, ymax = gdf_zipcodes.total_bounds
+
+    resolution_x = X.shape[1]
+    resolution_y = X.shape[0]
+
+    x_res = (xmax - xmin) / resolution_x
+    y_res = (ymax - ymin) / resolution_y
+    transform = Affine.translation(xmin, ymin) * Affine.scale(x_res, y_res)
+
+    shapes = [(geom, zip_code) for geom, zip_code in zip(gdf_zipcodes.geometry, gdf_zipcodes["MODZCTA"])]
+
+    zipcode_raster = rasterize(
+        shapes,
+        out_shape=(resolution_y, resolution_x),
+        transform=transform,
+        fill=-1,  # Fill non-covered cells with -1
+        dtype=int,
+        all_touched=True
+    )
+
+    return zipcode_raster
+
+zipcode_raster = build_zipcode_raster(gdf, X, Y)
+
+#%% Find ZIP Codes along the optimal path
+def coords_to_raster_indices(path_coords, X, Y):
+    x = X[0, :]
+    y = Y[:, 0]
+    indices = []
+    for lon, lat in path_coords:
+        idx_x = np.argmin(np.abs(x - lon))
+        idx_y = np.argmin(np.abs(y - lat))
+        indices.append((idx_y, idx_x))
+    return indices
+
+# Get raster indices for path
+path_indices = coords_to_raster_indices(path_coords, X, Y)
+
+# Extract ZIP codes along path
+zipcodes_along_path = [zipcode_raster[y, x] for y, x in path_indices]
+
+# Remove invalid ZIPs (if path goes outside ZIP areas)
+zipcodes_along_path = [zipcode for zipcode in zipcodes_along_path if zipcode != -1]
+
+# Convert to pandas series
+zipcodes_along_path = pd.Series([int(z) for z in zipcodes_along_path if z != 99999]).drop_duplicates().reset_index(drop=True)
+
+# Unique ZIP codes on path
+unique_zipcodes = list(set(zipcodes_along_path))
+
+print("ZIP codes on optimal path:", unique_zipcodes)
+
+#%% New Plot ZIP codes along the Optimal Path
+# Select ZIPs from GeoPandas dataframe
+selected_zipcodes = [int(z) for z in unique_zipcodes if z != 99999]  # Make sure they're normal integers
+gdf_selected = gdf[gdf["MODZCTA"].astype(int).isin(selected_zipcodes)]
+
+plt.figure(figsize=(8, 8))
+
+# Plot the mask
+plt.pcolormesh(X, Y, mask, shading='auto', cmap='gray_r')
+
+# Plot the ZIP code boundaries you passed
+gdf_selected.boundary.plot(ax=plt.gca(), edgecolor='green', linewidth=1.5)
+
+# Extract path coordinates into separate longitude and latitude lists
+path_lon, path_lat = zip(*path_coords)
+
+# Plot traveled path clearly in red
+plt.plot(path_lon, path_lat, color='red', linewidth=2)
+
+# Optional: clearly mark start and end points
+plt.scatter([start[0], end[0]], [start[1], end[1]], color='red', s=70, zorder=5)
+
+# Remove ticks and labels for clean visualization
+plt.xticks([])
+plt.yticks([])
+plt.gca().set_axis_off()
+
+# Title
+plt.title('Optimal Path via Fast Marching', fontsize=20)
+
+plt.tight_layout()
+plt.savefig("02_analysis/plots/path_on_raster_zip.png")
+plt.close()
+
+#%% Create new database table with the optimal path for every route
+# Database connection
+engine = create_engine("postgresql://postgres:axa_datascience@localhost:5432/citibike")
+#%%
+create_table_query = """
+DROP TABLE IF EXISTS station_pairs;
+
+CREATE TABLE station_pairs AS
+SELECT 
+    LEAST(start_station_name, end_station_name) AS station_start_name,
+    GREATEST(start_station_name, end_station_name) AS station_end_name,
+    COUNT(*) AS rides_count,
+    MIN(start_lat) AS start_lat,
+    MIN(start_lng) AS start_lng,
+    MIN(end_lat) AS end_lat,
+    MIN(end_lng) AS end_lng,
+    '[]'::text AS zip_codes
+FROM trips
+WHERE 
+    start_station_name IS NOT NULL
+    AND end_station_name IS NOT NULL
+GROUP BY 
+    station_start_name,
+    station_end_name
+ORDER BY 
+    rides_count DESC;
+"""
+
+with engine.begin() as connection:
+    connection.execute(text(create_table_query))
+
+#%% Safety checks
+query = "SELECT * FROM station_pairs LIMIT 10;"
+temp = pd.read_sql(query, engine)
+
+print(temp)
+
+# Sum up the total number of rides
+query = "SELECT SUM(rides_count) AS total_rides FROM station_pairs;"
+temp = pd.read_sql(query, engine)
+
+print("\nTotal number of rides:")
+print(temp)
+
+# Number of rows in the new table
+query = "SELECT COUNT(*) AS num_pairs FROM station_pairs;"
+temp = pd.read_sql(query, engine)
+
+print("\nNumber of station pairs (observations):")
+print(temp)
+
+#%% Add ID to database table
+with engine.begin() as conn:
+    conn.execute(text("""
+        ALTER TABLE station_pairs
+        ADD COLUMN id SERIAL PRIMARY KEY;
+    """))
+#%% Find Optimal path for every route in our dataset
+with engine.begin() as conn:
+    # Only select first 10 rows for testing
+    result = conn.execute(text("""
+        SELECT id, station_start_name, station_end_name, start_lat, start_lng, end_lat, end_lng
+        FROM station_pairs
+        WHERE zip_codes = '[]'
+        ORDER BY id;
+    """))
+
+    counter = 0
+
+    for row in result:
+        counter += 1
+
+        # Extract coordinates
+        start_lat = row.start_lat
+        start_lng = row.start_lng
+        end_lat = row.end_lat
+        end_lng = row.end_lng
+
+        start_coord = (start_lng, start_lat)  # (lon, lat)
+        end_coord = (end_lng, end_lat)
+
+        # Your travel path and zip code extraction
+        travel_time, path_coords = fast_marching_plotting(mask, X, Y, start_coord, end_coord)
+        path_indices = coords_to_raster_indices(path_coords, X, Y)
+        zipcodes_along_path = [zipcode_raster[y, x] for y, x in path_indices]
+        zipcodes_along_path = [zipcode for zipcode in zipcodes_along_path if zipcode != -1]
+
+        zipcodes_along_path = pd.Series(
+            [int(z) for z in zipcodes_along_path if z != 99999]).drop_duplicates().reset_index(drop=True)
+        unique_zipcodes = list(set(zipcodes_along_path))
+        zipcodes_json = json.dumps(unique_zipcodes)
+
+        # Update statement
+        update_query = text("""
+            UPDATE station_pairs
+            SET zip_codes = :zipcodes
+            WHERE id = :id
+        """)
+
+        conn.execute(update_query, {
+            'zipcodes': zipcodes_json,
+            'id': row.id
+        })
+
+        print(f"Processed station pair #{counter}")
+
+#%%
+query = "SELECT * FROM station_pairs LIMIT 10;"
+temp = pd.read_sql(query, engine)
+
+print(temp)
+
+#%%
+query = "SELECT * FROM station_pairs WHERE id BETWEEN 21 AND 30;"
+temp = pd.read_sql(query, engine)
+print(temp)
 
