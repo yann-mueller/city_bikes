@@ -10,6 +10,11 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
+import pandas as pd
+import xgboost as xgb
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, log_loss
+from sklearn.preprocessing import LabelEncoder
 from rasterio.features import rasterize
 from affine import Affine
 from shapely import wkt
@@ -459,7 +464,158 @@ temp = pd.read_sql(query, engine)
 print(temp)
 
 #%%
-query = "SELECT * FROM station_pairs WHERE id BETWEEN 21 AND 30;"
+#######################
+### RIDE PREDICTION ###
+#######################
+# Database connection
+engine = create_engine("postgresql://postgres:axa_datascience@localhost:5432/citibike")
+
+query = "SELECT * FROM trips LIMIT 10;"
 temp = pd.read_sql(query, engine)
+
 print(temp)
+
+#%% Load Name to ZIP matching
+query = "SELECT * FROM stations;"
+temp_stations = pd.read_sql(query, engine)
+
+temp_stations = temp_stations.drop_duplicates(subset=['station_name'], keep='first')
+
+print(temp_stations)
+
+#%% Load data
+query = """
+SELECT *
+FROM trips
+ORDER BY RANDOM()
+LIMIT 100000;
+"""
+sample_df = pd.read_sql(query, engine)
+
+### Data Transformation
+#%% Drop unnecessary columns
+sample_df = sample_df.drop(columns=['ride_id', 'start_station_id', 'end_station_id', 'start_lat', 'start_lng', 'end_lat', 'end_lng'])
+
+#%% Create new e_bike dummy column
+sample_df['e_bike'] = (sample_df['rideable_type'] == 'electric_bike').astype(int)
+sample_df = sample_df.drop(columns=['rideable_type'])
+
+#%% Create new member dummy column
+sample_df['member'] = (sample_df['member_casual'] == 'member').astype(int)
+sample_df = sample_df.drop(columns=['member_casual'])
+
+#%% Create start date columns
+sample_df['started_at'] = pd.to_datetime(sample_df['started_at'], format='mixed')
+
+# Monthly dummies
+for month in range(1, 13):
+    sample_df[f'started_at_month_{month}'] = (sample_df['started_at'].dt.month == month).astype(int)
+
+# Weekday dummies
+for weekday in range(7):
+    sample_df[f'started_at_weekday_{weekday}'] = (sample_df['started_at'].dt.weekday == weekday).astype(int)
+
+# 3-hour slots dummies
+def map_to_time_slot(hour):
+    return int(hour // 3)  # 0-7
+
+sample_df['time_slot'] = sample_df['started_at'].dt.hour.apply(map_to_time_slot)
+
+for slot in range(8):
+    sample_df[f'started_at_slot_{slot}'] = (sample_df['time_slot'] == slot).astype(int)
+
+# Drop the helper column 'time_slot' and original 'started_at'
+sample_df = sample_df.drop(columns=['time_slot', 'started_at'])
+
+#%% Create end date columns
+sample_df['ended_at'] = pd.to_datetime(sample_df['ended_at'], format='mixed')
+
+# Monthly dummies
+for month in range(1, 13):
+    sample_df[f'ended_at_month_{month}'] = (sample_df['ended_at'].dt.month == month).astype(int)
+
+# Weekday dummies
+for weekday in range(7):
+    sample_df[f'ended_at_weekday_{weekday}'] = (sample_df['ended_at'].dt.weekday == weekday).astype(int)
+
+# 3-hour slots dummies
+def map_to_time_slot(hour):
+    return int(hour // 1)  # 0-7
+
+sample_df['time_slot'] = sample_df['ended_at'].dt.hour.apply(map_to_time_slot)
+
+for slot in range(8):
+    sample_df[f'ended_at_slot_{slot}'] = (sample_df['time_slot'] == slot).astype(int)
+
+# Drop the helper column 'time_slot' and original 'ended_at'
+sample_df = sample_df.drop(columns=['time_slot', 'ended_at'])
+
+#%% Replace station names with correspond ZIP code areas
+sample_df = sample_df.merge(
+    temp_stations.rename(columns={'station_name': 'start_station_name', 'zip_code': 'start_zip'}),
+    on='start_station_name',
+    how='left'
+)
+
+sample_df = sample_df.merge(
+    temp_stations.rename(columns={'station_name': 'end_station_name', 'zip_code': 'end_zip'}),
+    on='end_station_name',
+    how='left'
+)
+
+sample_df = sample_df.dropna(subset=['start_zip', 'end_zip'])
+sample_df = sample_df.reset_index(drop=True)
+
+# Drop the station name columns
+sample_df = sample_df.drop(columns=['start_station_name', 'end_station_name'])
+
+# Get the current column order
+cols = sample_df.columns.tolist()
+
+# Reorder: start_zip, end_zip first, then the rest
+new_order = ['start_zip', 'end_zip'] + [col for col in cols if col not in ['start_zip', 'end_zip']]
+sample_df = sample_df[new_order]
+
+#%% Prepare features and target
+X = sample_df.drop('end_zip', axis=1)  # Features: everything except destination
+y = sample_df['end_zip']               # Target: destination zip
+
+#%% Label recoding
+le = LabelEncoder()
+
+# Fit encoder and transform y
+y_encoded = le.fit_transform(y)
+
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, random_state=42)
+
+#%% Set up XGBoost model
+model = xgb.XGBClassifier(
+    objective='multi:softprob',   # very important! -> probability output
+    num_class=len(y.unique()),    # number of destination zip codes
+    eval_metric='mlogloss',       # for multiclass classification
+    use_label_encoder=False,      # newer versions of XGBoost
+    max_depth=6,
+    learning_rate=0.1,
+    n_estimators=100,
+    tree_method="hist"            # faster if your data is large
+)
+
+#%% Train the model
+model.fit(X_train, y_train)
+
+#%% Predict probabilities for test set
+y_pred_proba = model.predict_proba(X_test)
+
+#%% Predict the most likely destination
+all_labels = list(range(len(le.classes_)))
+
+# Predict
+y_pred = model.predict(X_test)
+y_pred_proba = model.predict_proba(X_test)
+
+# 8. Evaluate the model
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("Log Loss:", log_loss(y_test, y_pred_proba, labels=all_labels))
+
 
