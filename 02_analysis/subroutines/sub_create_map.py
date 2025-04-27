@@ -17,7 +17,9 @@ def plot_zip_map(
         zip_column: str = "MODZCTA",
         value_label: str = "value",
         plot_title: str = "NYC Zip Code Map (colored by value)",
-        legend_label: str = "Value"
+        legend_label: str = "Value",
+        extent: tuple = None,
+        dot_color: str = None,
 ):
     """
     Plot a choropleth map of NYC zip code areas based on a CSV with geometry.
@@ -70,6 +72,33 @@ def plot_zip_map(
     # Title
     ax.set_title(plot_title, fontsize=18)
     ax.axis('off')
+
+    if extent is not None:
+        ax.set_xlim(extent[0], extent[1])  # xmin, xmax
+        ax.set_ylim(extent[2], extent[3])  # ymin, ymax
+
+    if dot_color is not None:
+        start = (-74.0145498363001, 40.71253895687167)  # AXA XL Office
+        end = (-73.78037574173788, 40.59253271869781)  # Rockaway Beach
+
+        # Define coordinates of the two points (longitude, latitude)
+        points = [start, end]
+        labels = ['AXA XL Office  ', '  Rockaway\nBeach']
+        alignments = [{'ha': 'right', 'va': 'center', 'xytext': (-5, 0)},
+                      {'ha': 'center', 'va': 'top', 'xytext': (0, -10)}]
+
+        # Plot points with adjusted labels
+        for (lon, lat), label, align in zip(points, labels, alignments):
+            ax.scatter(lon, lat, color=dot_color, s=50, zorder=5)
+            ax.annotate(label,
+                        xy=(lon, lat),
+                        xytext=align['xytext'],
+                        textcoords='offset points',
+                        fontsize=12,
+                        color=dot_color,
+                        weight='bold',
+                        ha=align['ha'],
+                        va=align['va'])
 
     # Adjust colorbar
     cbar = color_map.get_figure().get_axes()[-1]

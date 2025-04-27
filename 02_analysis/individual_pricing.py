@@ -12,6 +12,7 @@ import numpy as np
 import rasterio
 import pandas as pd
 import xgboost as xgb
+import importlib.util
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, log_loss
 from sklearn.preprocessing import LabelEncoder
@@ -20,6 +21,14 @@ from affine import Affine
 from shapely import wkt
 from shapely.geometry import Point
 from sqlalchemy import create_engine, text
+
+# Path to the file you want to import from
+file_path = os.path.join(os.getcwd(), "02_analysis", "subroutines", "sub_create_map.py")
+
+# Load the module manually
+spec = importlib.util.spec_from_file_location("sub_create_map", file_path)
+sub_create_map = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(sub_create_map)
 
 #%%
 ########################
@@ -248,7 +257,6 @@ path_lon, path_lat = zip(*path_coords)
 # Plot traveled path clearly in red
 plt.plot(path_lon, path_lat, color='red', linewidth=2)
 
-# Optional: clearly mark start and end points
 plt.scatter([start[0], end[0]], [start[1], end[1]], color='red', s=70, zorder=5)
 
 # Remove ticks and labels for clean visualization
@@ -483,7 +491,7 @@ temp_stations = temp_stations.drop_duplicates(subset=['station_name'], keep='fir
 
 print(temp_stations)
 
-#%% Load data
+#%% Load rides data
 query = """
 SELECT *
 FROM trips
@@ -491,6 +499,42 @@ ORDER BY RANDOM()
 LIMIT 100000;
 """
 sample_df = pd.read_sql(query, engine)
+
+#%% Load weather data
+# NY coordinates
+latitude = 40.7128
+longitude = -74.0060
+
+# Download weather data from Open-Meteo
+# API URL
+url = f"https://archive-api.open-meteo.com/v1/archive?" \
+      f"latitude={latitude}&longitude={longitude}" \
+      f"&start_date=2024-01-01&end_date=2024-12-31" \
+      f"&daily=precipitation_sum,temperature_2m_max,temperature_2m_min,snowfall_sum,windspeed_10m_max" \
+      f"&timezone=America/New_York"
+
+# API request
+response = requests.get(url)
+data = response.json()
+
+weather_df = pd.DataFrame({
+    "date": pd.to_datetime(data["daily"]["time"]),
+    "precipitation_sum_mm": data["daily"]["precipitation_sum"],
+    "temperature_max_c": data["daily"]["temperature_2m_max"],
+    "temperature_min_c": data["daily"]["temperature_2m_min"],
+    "snowfall_sum_cm": data["daily"]["snowfall_sum"],
+    "windspeed_max_kmh": data["daily"]["windspeed_10m_max"]
+})
+
+sample_df['started_at'] = pd.to_datetime(sample_df['started_at'], format='mixed')
+
+sample_df['date'] = sample_df['started_at'].dt.date
+
+weather_df['date'] = pd.to_datetime(weather_df['date']).dt.date
+
+sample_df = sample_df.merge(weather_df, on='date', how='left')
+
+sample_df = sample_df.drop(columns=['date'])
 
 ### Data Transformation
 #%% Drop unnecessary columns
@@ -515,17 +559,13 @@ for month in range(1, 13):
 for weekday in range(7):
     sample_df[f'started_at_weekday_{weekday}'] = (sample_df['started_at'].dt.weekday == weekday).astype(int)
 
-# 3-hour slots dummies
-def map_to_time_slot(hour):
-    return int(hour // 3)  # 0-7
+# Hourly dummies
+sample_df['started_at_hour'] = sample_df['started_at'].dt.hour
+for hour in range(24):
+    sample_df[f'started_at_hour_{hour}'] = (sample_df['started_at_hour'] == hour).astype(int)
 
-sample_df['time_slot'] = sample_df['started_at'].dt.hour.apply(map_to_time_slot)
-
-for slot in range(8):
-    sample_df[f'started_at_slot_{slot}'] = (sample_df['time_slot'] == slot).astype(int)
-
-# Drop the helper column 'time_slot' and original 'started_at'
-sample_df = sample_df.drop(columns=['time_slot', 'started_at'])
+# Drop helper columns
+sample_df = sample_df.drop(columns=['started_at', 'started_at_hour'])
 
 #%% Create end date columns
 sample_df['ended_at'] = pd.to_datetime(sample_df['ended_at'], format='mixed')
@@ -538,17 +578,13 @@ for month in range(1, 13):
 for weekday in range(7):
     sample_df[f'ended_at_weekday_{weekday}'] = (sample_df['ended_at'].dt.weekday == weekday).astype(int)
 
-# 3-hour slots dummies
-def map_to_time_slot(hour):
-    return int(hour // 1)  # 0-7
+# Hourly dummies
+sample_df['ended_at_hour'] = sample_df['ended_at'].dt.hour
+for hour in range(24):
+    sample_df[f'ended_at_hour_{hour}'] = (sample_df['ended_at_hour'] == hour).astype(int)
 
-sample_df['time_slot'] = sample_df['ended_at'].dt.hour.apply(map_to_time_slot)
-
-for slot in range(8):
-    sample_df[f'ended_at_slot_{slot}'] = (sample_df['time_slot'] == slot).astype(int)
-
-# Drop the helper column 'time_slot' and original 'ended_at'
-sample_df = sample_df.drop(columns=['time_slot', 'ended_at'])
+# Drop helper columns
+sample_df = sample_df.drop(columns=['ended_at', 'ended_at_hour'])
 
 #%% Replace station names with correspond ZIP code areas
 sample_df = sample_df.merge(
@@ -619,3 +655,72 @@ print("Accuracy:", accuracy_score(y_test, y_pred))
 print("Log Loss:", log_loss(y_test, y_pred_proba, labels=all_labels))
 
 
+#%% Prediction Illustration
+# Create an empty DataFrame with the same columns as your model expects
+X_example = pd.DataFrame(columns=X_train.columns)
+
+X_example.loc[0] = 0
+
+# Start zip code
+X_example.at[0, 'start_zip'] = 110281  # AXA XL Office ZIP code
+
+# Weather data
+X_example.at[0, 'precipitation_sum_mm'] = 0.0
+X_example.at[0, 'temperature_max_c'] = 25
+X_example.at[0, 'temperature_min_c'] = 18
+X_example.at[0, 'snowfall_sum_cm'] = 0.0
+X_example.at[0, 'windspeed_max_kmh'] = 10
+
+# Member status
+X_example.at[0, 'member'] = 1  # 1 if member, 0 if casual
+
+# Time features
+# Set specific month, weekday and hour manually:
+X_example.at[0, 'started_at_month_4'] = 1  # April
+X_example.at[0, 'started_at_weekday_2'] = 1  # Wednesday
+X_example.at[0, 'started_at_hour_12'] = 1  # 12AM
+
+X_example.at[0, 'ended_at_month_4'] = 1  # April
+X_example.at[0, 'ended_at_weekday_2'] = 1  # Wednesday
+X_example.at[0, 'ended_at_hour_12'] = 1  # 12AM
+
+y_pred_proba_example = model.predict_proba(X_example)[0]  # get the first (and only) row
+
+# Map class indices back to zip codes
+predicted_zip_codes = le.inverse_transform(np.arange(len(y_pred_proba_example)))
+
+# Prepare lists (make sure to use *_example everywhere)
+zip_codes_list = [str(z) for z in predicted_zip_codes]
+cleaned_zip_codes_list = [str(int(float(z))) for z in zip_codes_list]
+
+probabilities_list = (np.array(y_pred_proba_example) * 100).tolist()
+
+# Plot
+sub_create_map.plot_zip_map(
+    zip_codes=cleaned_zip_codes_list,
+    values=probabilities_list,
+    output_name='predicted_destination_probs',
+    value_label='probabilities_list',
+    legend_label='Wahrscheinlichkeit (%)',
+    plot_title='Prediction ZIP Code Endstation',
+    extent=(-74.05, -73.93, 40.68, 40.81),
+    dot_color='darkred'
+)
+
+
+#%%
+# Load your shapefile CSV
+map_df = pd.read_csv("02_analysis/subroutines/input/map_nyc/Modified_Zip_Code_Tabulation_Areas_MODZCTA_20250425.csv")
+
+# Make sure zip codes are strings
+map_zip_codes = map_df['MODZCTA'].astype(str).unique().tolist()
+
+#%%
+# Filter only zip codes that exist in the map
+filtered_zip_codes = []
+filtered_probs = []
+
+for zip_code, prob in zip(zip_codes_list, probabilities_list):
+    if zip_code in map_zip_codes:
+        filtered_zip_codes.append(zip_code)
+        filtered_probs.append(prob)
