@@ -29,7 +29,7 @@ temp = pd.read_sql("SELECT COUNT(DISTINCT start_station_id) AS unique_start_stat
 print(temp)
 
 #%% Number of observations
-temp = pd.read_sql("SELECT COUNT(*) AS total_rows FROM trips", con=engine)
+temp = pd.read_sql("SELECT COUNT(*) AS total_rows FROM trips WHERE DATE_PART('year', started_at::timestamp) = 2024", con=engine)
 print(temp)
 
 #%% Rides per month & Plot

@@ -6,6 +6,7 @@ import pandas as pd
 import shutil
 import geopandas as gpd
 from shapely import wkt
+from shapely.geometry import Point
 from sqlalchemy import create_engine, text
 #%%
 # Configuration
@@ -172,6 +173,56 @@ with engine.begin() as conn:
     print("Duplications removed and table updated.")
 
 #%% Add ZIP codes to every observation
+# Create dataframe with all CitiBike stations and longitude and latitude
+# Average lng and lat for every station due to slight GPS variations
+query = """
+SELECT 
+    station_id,
+    station_name,
+    AVG(latitude) AS avg_latitude,
+    AVG(longitude) AS avg_longitude
+FROM (
+    SELECT 
+        start_station_id AS station_id,
+        start_station_name AS station_name,
+        start_lat AS latitude,
+        start_lng AS longitude
+    FROM trips
+
+    UNION ALL
+
+    SELECT 
+        end_station_id AS station_id,
+        end_station_name AS station_name,
+        end_lat AS latitude,
+        end_lng AS longitude
+    FROM trips
+) AS all_stations
+WHERE station_id IS NOT NULL
+GROUP BY station_id, station_name
+ORDER BY station_name;
+"""
+
+stations = pd.read_sql(query, engine)
+print(stations)
+
+#%% Diagnostics
+stations.isna().sum()
+
+stations[stations['station_id'] == 'nan']
+
+# Replace string 'nan' with real np.nan
+stations.replace('nan', pd.NA, inplace=True)
+
+# Drop all rows where station_name or station_id is missing
+stations = stations.dropna(subset=['station_name', 'station_id']).reset_index(drop=True)
+
+# Check for duplicate stations
+stations['station_name'].duplicated().sum()
+
+stations = stations.drop(columns=['station_id'])
+
+#%% Read shapefile
 csv_path = "02_analysis/subroutines/input/map_nyc/Modified_Zip_Code_Tabulation_Areas_MODZCTA_20250425.csv"
 df = pd.read_csv(csv_path)
 
@@ -187,3 +238,17 @@ if not geometry_col:
 df[geometry_col] = df[geometry_col].apply(wkt.loads)
 gdf = gpd.GeoDataFrame(df, geometry=df[geometry_col], crs="EPSG:4326")
 
+#%% Add ZIP Code to stations df
+stations['geometry'] = stations.apply(lambda row: Point(row['avg_longitude'], row['avg_latitude']), axis=1)
+stations_gdf = gpd.GeoDataFrame(stations, geometry='geometry', crs="EPSG:4326")
+
+# Spatial join with ZIP code polygons
+stations_with_zip = gpd.sjoin(stations_gdf, gdf[['MODZCTA', 'geometry']], how='left', predicate='within')
+stations['zip_code'] = stations_with_zip['MODZCTA'].values
+
+print(stations.head())
+
+#%% Add ZIP Codes to database
+stations = stations[['station_name', 'zip_code']]
+
+stations.to_sql('stations', con=engine, if_exists='replace', index=False)
