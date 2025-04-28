@@ -17,6 +17,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, log_loss, confusion_matrix, roc_auc_score
 from sklearn.preprocessing import LabelEncoder
 from rasterio.features import rasterize
+from scipy.stats import rankdata
 from affine import Affine
 from xgboost import plot_importance
 from shapely import wkt
@@ -417,6 +418,7 @@ with engine.begin() as conn:
         ALTER TABLE station_pairs
         ADD COLUMN id SERIAL PRIMARY KEY;
     """))
+
 #%% Find Optimal path for every route in our dataset
 with engine.begin() as conn:
     # Only select first 10 rows for testing
@@ -471,11 +473,227 @@ with engine.begin() as conn:
 
         print(f"Processed station pair #{counter}")
 
-#%%
-query = "SELECT * FROM station_pairs LIMIT 10;"
+#%% Table Check
+query = "SELECT * FROM station_pairs LIMIT 100;"
 temp = pd.read_sql(query, engine)
 
 print(temp)
+
+#%% Safety Check: Longest Ride
+query = """
+SELECT 
+    id, 
+    zip_codes,
+    -- Count commas and add 1 (elements = commas + 1)
+    LENGTH(zip_codes) - LENGTH(REPLACE(zip_codes, ',', '')) + 1 AS num_zipcodes
+FROM station_pairs
+WHERE zip_codes != '[]'
+ORDER BY num_zipcodes DESC
+LIMIT 1;
+"""
+result = pd.read_sql(query, engine)
+print(result)
+
+#%% Count Rides per ZIP Code Area
+with engine.begin() as conn:
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS zip_code_counts (
+            zip_code INTEGER PRIMARY KEY,
+            count INTEGER
+        );
+    """))
+
+    conn.execute(text("""
+        WITH all_zip_codes AS (
+            SELECT 
+                TRIM(BOTH '[]' FROM zip_codes) AS cleaned_zipcodes
+            FROM station_pairs
+            WHERE zip_codes != '[]'
+        ), exploded AS (
+            SELECT 
+                unnest(string_to_array(cleaned_zipcodes, ','))::INTEGER AS zip_code
+            FROM all_zip_codes
+        )
+        INSERT INTO zip_code_counts (zip_code, count)
+        SELECT 
+            zip_code,
+            COUNT(*) AS count
+        FROM exploded
+        GROUP BY zip_code
+        ORDER BY zip_code;
+    """))
+
+#%% Table Check
+query = "SELECT * FROM zip_code_counts;"
+zip_rides = pd.read_sql(query, engine)
+
+print(zip_rides)
+
+#%% Add new Bike Accidents column
+with engine.begin() as conn:
+    conn.execute(text("""
+        ALTER TABLE zip_code_counts
+        ADD COLUMN bike_accidents_2024 INTEGER DEFAULT 0;
+    """))
+
+#%% Get Bike Accidents
+engine = create_engine("postgresql://postgres:axa_datascience@localhost:5432/nypd")
+
+# Unique contributing factors
+query = """
+SELECT DISTINCT vehicle_type_code_1 AS factor FROM collisions
+UNION
+SELECT DISTINCT vehicle_type_code_2 FROM collisions
+UNION
+SELECT DISTINCT vehicle_type_code_3 FROM collisions
+UNION
+SELECT DISTINCT vehicle_type_code_4 FROM collisions
+UNION
+SELECT DISTINCT vehicle_type_code_5 FROM collisions
+ORDER BY factor;
+"""
+
+temp = pd.read_sql(query, engine)
+print(temp)
+
+# Filter for vehicle types containing 'bike' or 'bicycle'
+bike_strings = temp[temp['factor'].str.contains('bike|bicycle', case=False, na=False)]
+
+# Convert to list
+bike_strings_list = bike_strings['factor'].tolist()
+
+print(bike_strings_list)
+
+# Entries to remove
+to_remove = ['Dart bike', 'dirt bike', 'Dirt Bike', 'DIRT BIKE', 'dirtbike', 'Dirtbike', 'DIRTBIKE', 'Moped bike',
+             'gas bike', 'Minibike', 'Motorbike', 'motorbike', 'PEDAL BIKE', 'Dirt Bike']
+
+# Filter the list
+bike_strings_list = [item for item in bike_strings_list if item not in to_remove]
+
+print(bike_strings_list)
+
+# Create a tuple of strings for SQL IN clause
+bike_tuple = tuple(bike_strings_list)
+
+
+#%% Connect to the NYPD database
+query = f"""
+WITH bike_collisions AS (
+    SELECT 
+        zip_code,
+        number_of_persons_injured,
+        number_of_cyclist_injured,
+        number_of_pedestrians_injured,
+        number_of_cyclist_killed,
+        number_of_pedestrians_killed,
+        vehicle_type_code_1,
+        vehicle_type_code_2,
+        vehicle_type_code_3,
+        vehicle_type_code_4,
+        vehicle_type_code_5
+    FROM collisions
+),
+bike_crashes AS (
+    SELECT 
+        zip_code,
+        COUNT(*) AS bike_accidents
+    FROM bike_collisions
+    WHERE 
+        vehicle_type_code_1 IN {bike_tuple} OR
+        vehicle_type_code_2 IN {bike_tuple} OR
+        vehicle_type_code_3 IN {bike_tuple} OR
+        vehicle_type_code_4 IN {bike_tuple} OR
+        vehicle_type_code_5 IN {bike_tuple}
+    GROUP BY zip_code
+)
+SELECT 
+    zip_code,
+    bike_accidents
+FROM 
+    bike_crashes
+ORDER BY 
+    bike_accidents DESC;
+"""
+
+bike_accidents_2024 = pd.read_sql(query, engine)
+bike_accidents_2024 = bike_accidents_2024.dropna(subset=["zip_code"])
+
+bike_accidents_2024["zip_code"] = bike_accidents_2024["zip_code"].astype(int)
+print(bike_accidents_2024.head())
+
+#%%
+engine = create_engine("postgresql://postgres:axa_datascience@localhost:5432/citibike")
+zip_rides = pd.read_sql("SELECT * FROM zip_code_counts;", engine)
+print(zip_rides.head())
+
+#%% Merge Rides and Accidents
+zip_rides = zip_rides.merge(
+    bike_accidents_2024,
+    how='left',
+    on='zip_code'
+)
+
+# Fill missing accident counts with 0
+zip_rides['bike_accidents_2024'] = zip_rides['bike_accidents_2024'].fillna(0).astype(int)
+zip_rides['bike_accidents_2024'] = zip_rides['bike_accidents'].fillna(0).astype(int)
+zip_rides = zip_rides.drop(columns=['bike_accidents'])
+
+print(zip_rides.head())
+
+# Store in database
+zip_rides.to_sql('zip_code_counts_with_bikeaccidents', engine, if_exists='replace', index=False)
+
+#%% Compute share and percentiles
+zip_rides['bike_share_2024'] = zip_rides['bike_accidents_2024'] / zip_rides['count']
+
+# Counts percentiles
+zip_rides['count_percentile'] = rankdata(zip_rides['count'], method='average') / len(zip_rides['count']) * 100
+
+# Bike share percentiles
+zip_rides['bike_share_percentile'] = rankdata(zip_rides['bike_share_2024'], method='average') / len(zip_rides['bike_share_2024']) * 100
+
+zip_rides['count_percentile'] = zip_rides['count_percentile'].round(2)
+zip_rides['bike_share_percentile'] = zip_rides['bike_share_percentile'].round(2)
+
+
+# Store in database
+zip_rides.to_sql('zip_code_counts_with_bikeaccidents', engine, if_exists='replace', index=False)
+
+#%%
+temp = pd.read_sql("SELECT * FROM zip_code_counts_with_bikeaccidents;", engine)
+print(temp.head())
+
+#%% Plot Rides and Risk by ZIP Code
+# Convert zip_code to string (important for matching shapefile)
+zip_rides["zip_code"] = zip_rides["zip_code"].astype(int).astype(str)
+
+# Extract values
+zip_codes = zip_rides["zip_code"].tolist()
+rides = zip_rides["count"].tolist()
+accidents_rides_share = zip_rides["bike_share_2024"].tolist()
+rides_percentile = zip_rides["count_percentile"].tolist()
+accidents_rides_share_percentile = zip_rides["bike_share_percentile"].tolist()
+
+sub_create_map.plot_zip_map(
+    zip_codes=zip_codes,
+    values=rides_percentile,
+    output_name='rides_percentile_zip',
+    value_label='rides_percentile',
+    legend_label='Anzahl Fahrten (Perzentil)',
+    plot_title='Fahrten nach ZIP Code (Perzentil, 2024)',
+    fill_missing_with_neighbors = True
+)
+
+sub_create_map.plot_zip_map(
+    zip_codes=zip_codes,
+    values=accidents_rides_share_percentile,
+    output_name='accidents_rides_share_percentile_zip',
+    value_label='accidents_rides_share_percentile',
+    legend_label='Unfallrate (Perzentil)',
+    plot_title='Unfallrate nach ZIP Code (Perzentil, 2024)',
+    fill_missing_with_neighbors = True
+)
 
 #%%
 #######################
@@ -770,4 +988,3 @@ sub_create_map.plot_zip_map(
     extent=(-74.05, -73.93, 40.68, 40.81),
     dot_color='red'
 )
-

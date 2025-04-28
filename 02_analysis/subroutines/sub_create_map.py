@@ -20,6 +20,7 @@ def plot_zip_map(
         legend_label: str = "Value",
         extent: tuple = None,
         dot_color: str = None,
+        fill_missing_with_neighbors: bool = False
 ):
     """
     Plot a choropleth map of NYC zip code areas based on a CSV with geometry.
@@ -55,6 +56,33 @@ def plot_zip_map(
     zip_value_df = pd.DataFrame({zip_column: zip_codes, value_label: values})
     zip_value_df[zip_column] = zip_value_df[zip_column].astype(str)
     merged = gdf.merge(zip_value_df, on=zip_column, how="left")
+
+    # 🆕 Fill missing ZIP codes based on neighbors
+    if fill_missing_with_neighbors:
+        print("Filling missing ZIP codes based on neighbors...")
+
+        # Create a spatial index to speed up neighbor search
+        gdf_sindex = gdf.sindex
+
+        for idx, row in merged[merged[value_label].isna()].iterrows():
+            # Find neighboring geometries
+            possible_neighbors_idx = list(gdf_sindex.intersection(row.geometry.bounds))
+            possible_neighbors = gdf.iloc[possible_neighbors_idx]
+
+            # True neighbors = geometries that actually touch
+            true_neighbors = possible_neighbors[possible_neighbors.geometry.touches(row.geometry)]
+
+            # Only neighbors that have a known value
+            neighbors_with_values = merged.loc[true_neighbors.index]
+            neighbors_with_values = neighbors_with_values[neighbors_with_values[value_label].notna()]
+
+            if not neighbors_with_values.empty:
+                # Calculate mean value of the neighbors
+                avg_value = neighbors_with_values[value_label].mean()
+                merged.at[idx, value_label] = avg_value
+                print(f"Filled ZIP {row[zip_column]} with neighbor average {avg_value:.2f}")
+            else:
+                print(f"No valid neighbors found for ZIP {row[zip_column]} — remains missing.")
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
