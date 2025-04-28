@@ -3,7 +3,6 @@ import os
 import json
 import requests
 import zipfile
-import pandas as pd
 import shutil
 import skfmm
 import geopandas as gpd
@@ -13,11 +12,13 @@ import rasterio
 import pandas as pd
 import xgboost as xgb
 import importlib.util
+import seaborn as sns
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, log_loss
+from sklearn.metrics import accuracy_score, log_loss, confusion_matrix, roc_auc_score
 from sklearn.preprocessing import LabelEncoder
 from rasterio.features import rasterize
 from affine import Affine
+from xgboost import plot_importance
 from shapely import wkt
 from shapely.geometry import Point
 from sqlalchemy import create_engine, text
@@ -110,7 +111,7 @@ for (lon, lat), label, align in zip(points, labels, alignments):
                 va=align['va'])
 
 # Styling adjustments
-ax.set_title("NYC Road Network", fontsize=20)
+ax.set_title("NYC Transportation Network", fontsize=20)
 ax.set_axis_off()
 
 plt.tight_layout()
@@ -499,9 +500,7 @@ print(temp_stations)
 #%% Load rides data
 query = """
 SELECT *
-FROM trips
-ORDER BY RANDOM()
-LIMIT 100000;
+FROM trips;
 """
 sample_df = pd.read_sql(query, engine)
 
@@ -659,6 +658,67 @@ y_pred_proba = model.predict_proba(X_test)
 print("Accuracy:", accuracy_score(y_test, y_pred))
 print("Log Loss:", log_loss(y_test, y_pred_proba, labels=all_labels))
 
+# Compute Top-N Hit Rates
+top_ns = [1, 3, 5, 10, 20]
+hit_rates = []
+
+for n in top_ns:
+    topn_pred = np.argsort(y_pred_proba, axis=1)[:, -n:]
+    topn_hits = [y_test[i] in topn_pred[i] for i in range(len(y_test))]
+    topn_hit_rate = np.mean(topn_hits)
+    hit_rates.append(topn_hit_rate)
+    print(f"Top-{n} Hit Rate: {topn_hit_rate:.4f}")
+
+# Plot Hit Rates
+plt.figure(figsize=(12, 6))
+plt.bar([f"Top-{n}" for n in top_ns], hit_rates, color='royalblue')
+
+plt.ylim(0, 1)
+plt.ylabel("Hit Rate", fontsize=18)  # correct: fontsize not size
+plt.title("Top-N Hit Rates", fontsize=18)
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+
+plt.grid(axis='y', linestyle='--', alpha=0.7)
+plt.tight_layout()
+plt.savefig("02_analysis/plots/hit_rates.png")
+plt.close()
+
+# Confusion Matrix
+cm = confusion_matrix(y_test, y_pred)
+cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+
+plt.figure(figsize=(10, 8))
+sns.heatmap(cm_normalized, cmap="Blues", xticklabels=False, yticklabels=False)
+plt.title('Normalized Confusion Matrix')
+plt.xlabel('Predicted Label')
+plt.ylabel('True Label')
+plt.tight_layout()
+plt.savefig("02_analysis/plots/confusion_matrix.png")
+plt.close()
+
+# Feature Importance
+fig, ax = plt.subplots(figsize=(10, 12))
+
+plot_importance(
+    model,
+    ax=ax,
+    importance_type='gain',
+    max_num_features=20,
+    title="Feature Importance (Top 20)",
+    xlabel="Importance (Gain)",
+    show_values=False,
+    grid=False
+)
+
+ax.title.set_fontsize(16)
+ax.xaxis.label.set_fontsize(14)
+ax.yaxis.label.set_fontsize(14)
+ax.tick_params(axis='both', which='major', labelsize=12)
+
+plt.tight_layout()
+plt.savefig("02_analysis/plots/plot_importance.png")
+plt.close()
 #%% Prediction Illustration
 # Create an empty DataFrame with the same columns as your model expects
 X_example = pd.DataFrame(columns=X_train.columns)
