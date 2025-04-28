@@ -637,23 +637,22 @@ model = xgb.XGBClassifier(
     tree_method="hist"            # faster if your data is large
 )
 
-#%% Train the model
+#%% Train model
 model.fit(X_train, y_train)
 
 #%% Predict probabilities for test set
 y_pred_proba = model.predict_proba(X_test)
 
-#%% Predict the most likely destination
+#%% Predict most likely destination
 all_labels = list(range(len(le.classes_)))
 
 # Predict
 y_pred = model.predict(X_test)
 y_pred_proba = model.predict_proba(X_test)
 
-# 8. Evaluate the model
+# Evaluate model
 print("Accuracy:", accuracy_score(y_test, y_pred))
 print("Log Loss:", log_loss(y_test, y_pred_proba, labels=all_labels))
-
 
 #%% Prediction Illustration
 # Create an empty DataFrame with the same columns as your model expects
@@ -704,23 +703,6 @@ sub_create_map.plot_zip_map(
     legend_label='Wahrscheinlichkeit (%)',
     plot_title='Prediction ZIP Code Endstation',
     extent=(-74.05, -73.93, 40.68, 40.81),
-    dot_color='darkred'
+    dot_color='red'
 )
 
-
-#%%
-# Load your shapefile CSV
-map_df = pd.read_csv("02_analysis/subroutines/input/map_nyc/Modified_Zip_Code_Tabulation_Areas_MODZCTA_20250425.csv")
-
-# Make sure zip codes are strings
-map_zip_codes = map_df['MODZCTA'].astype(str).unique().tolist()
-
-#%%
-# Filter only zip codes that exist in the map
-filtered_zip_codes = []
-filtered_probs = []
-
-for zip_code, prob in zip(zip_codes_list, probabilities_list):
-    if zip_code in map_zip_codes:
-        filtered_zip_codes.append(zip_code)
-        filtered_probs.append(prob)
