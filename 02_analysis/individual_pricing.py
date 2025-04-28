@@ -437,6 +437,11 @@ with engine.begin() as conn:
         end_lat = row.end_lat
         end_lng = row.end_lng
 
+        # Skip rows with missing coordinates
+        if None in (start_lat, start_lng, end_lat, end_lng):
+            print(f"Skipping row {row.id} because coordinates are missing.")
+            continue
+
         start_coord = (start_lng, start_lat)  # (lon, lat)
         end_coord = (end_lng, end_lat)
 
