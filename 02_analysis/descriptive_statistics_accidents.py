@@ -8,7 +8,6 @@ import pandas as pd
 from sqlalchemy import create_engine
 import importlib.util
 
-# Path to the file you want to import from
 file_path = os.path.join(os.getcwd(), "02_analysis", "subroutines", "sub_create_map.py")
 
 # Load the module manually
@@ -138,12 +137,8 @@ ORDER BY
 
 temp = pd.read_sql(query, engine)
 print(temp)
-
-
 print(f"Average Bike Accidents per Month: {temp['bike_accidents'].mean():.2f}")
 
-
-# Make sure 'month' is datetime and sorted
 temp['month'] = pd.to_datetime(temp['month'])
 temp = temp.sort_values('month')
 
@@ -258,7 +253,6 @@ ORDER BY
 temp = pd.read_sql(query, engine)
 print(temp)
 
-
 #%% Accidents by 3-Hour Time Slots (2010-2024)
 query = f"""
 WITH all_collisions AS (
@@ -316,10 +310,8 @@ ORDER BY
 
 temp = pd.read_sql(query, engine)
 
-# Optional: Label the time slots
 temp['time_slot'] = temp['hour_bin'].apply(lambda h: f"{h:02d}:00–{(h + 3) % 24:02d}:00")
 
-# Reorder columns
 temp = temp[['time_slot', 'bike_accidents', 'injured_bike_accidents', 'injured_share', 'fatal_bike_accidents', 'fatal_share']]
 print(temp)
 
@@ -380,7 +372,6 @@ ORDER BY
 
 temp = pd.read_sql(query, engine)
 print(temp)
-
 
 #%% Accidents by Zip Code (2010-2024)
 query = f"""
