@@ -140,9 +140,9 @@ def build_raster_mask(gdf_streets, resolution=200):
         shapes=shapes,
         out_shape=(height, width),
         transform=transform,
-        fill=100,    # Cells without road
+        fill=100,
         dtype=np.float32,
-        all_touched=True  # Consider any touched cell as "on road"
+        all_touched=True
     )
 
     # Create coordinate grid (X,Y)
@@ -187,7 +187,7 @@ def fast_marching_plotting(mask, X, Y, start_coord, end_coord):
     path = [end_idx]
     current = end_idx
 
-    # Search 8-neighborhood (diagonals allowed)
+    # Search 8-neighborhood
     directions = [(-1, 0), (1, 0), (0, -1), (0, 1),
                   (-1, -1), (-1, 1), (1, -1), (1, 1)]
 
@@ -226,12 +226,10 @@ mask, X, Y = build_raster_mask(gdf_roads, resolution=200)
 plt.figure(figsize=(8, 8))
 plt.pcolormesh(X, Y, mask, shading='auto', cmap='gray_r')
 
-# Remove ticks and labels
 plt.xticks([])
 plt.yticks([])
 plt.gca().set_axis_off()
 
-# Title only
 plt.title('Raster Mask Visualization', fontsize=20)
 
 plt.tight_layout()
@@ -261,7 +259,6 @@ plt.plot(path_lon, path_lat, color='red', linewidth=2)
 
 plt.scatter([start[0], end[0]], [start[1], end[1]], color='red', s=70, zorder=5)
 
-# Remove ticks and labels for clean visualization
 plt.xticks([])
 plt.yticks([])
 plt.gca().set_axis_off()
@@ -336,20 +333,12 @@ plt.figure(figsize=(8, 8))
 
 # Plot the mask
 plt.pcolormesh(X, Y, mask, shading='auto', cmap='gray_r')
-
-# Plot the ZIP code boundaries you passed
 gdf_selected.boundary.plot(ax=plt.gca(), edgecolor='green', linewidth=1.5)
-
-# Extract path coordinates into separate longitude and latitude lists
 path_lon, path_lat = zip(*path_coords)
 
-# Plot traveled path clearly in red
 plt.plot(path_lon, path_lat, color='red', linewidth=2)
-
-# Optional: clearly mark start and end points
 plt.scatter([start[0], end[0]], [start[1], end[1]], color='red', s=70, zorder=5)
 
-# Remove ticks and labels for clean visualization
 plt.xticks([])
 plt.yticks([])
 plt.gca().set_axis_off()
@@ -830,7 +819,7 @@ sample_df = sample_df.drop(columns=['start_station_name', 'end_station_name'])
 # Get the current column order
 cols = sample_df.columns.tolist()
 
-# Reorder: start_zip, end_zip first, then the rest
+# Reorder: start_zip, end_zip first
 new_order = ['start_zip', 'end_zip'] + [col for col in cols if col not in ['start_zip', 'end_zip']]
 sample_df = sample_df[new_order]
 
@@ -840,8 +829,6 @@ y = sample_df['end_zip']               # Target: destination zip
 
 #%% Label recoding
 le = LabelEncoder()
-
-# Fit encoder and transform y
 y_encoded = le.fit_transform(y)
 
 # Train-test split
@@ -849,14 +836,14 @@ X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2,
 
 #%% Set up XGBoost model
 model = xgb.XGBClassifier(
-    objective='multi:softprob',   # very important! -> probability output
-    num_class=len(y.unique()),    # number of destination zip codes
-    eval_metric='mlogloss',       # for multiclass classification
-    use_label_encoder=False,      # newer versions of XGBoost
+    objective='multi:softprob',
+    num_class=len(y.unique()),
+    eval_metric='mlogloss',
+    use_label_encoder=False,
     max_depth=6,
     learning_rate=0.1,
     n_estimators=100,
-    tree_method="hist"            # faster if your data is large
+    tree_method="hist"
 )
 
 #%% Train model
@@ -938,7 +925,6 @@ plt.tight_layout()
 plt.savefig("02_analysis/plots/plot_importance.png")
 plt.close()
 #%% Prediction Illustration
-# Create an empty DataFrame with the same columns as your model expects
 X_example = pd.DataFrame(columns=X_train.columns)
 
 X_example.loc[0] = 0
@@ -957,7 +943,7 @@ X_example.at[0, 'windspeed_max_kmh'] = 10
 X_example.at[0, 'member'] = 1  # 1 if member, 0 if casual
 
 # Time features
-# Set specific month, weekday and hour manually:
+# Day of Interview :)
 X_example.at[0, 'started_at_month_4'] = 1  # April
 X_example.at[0, 'started_at_weekday_2'] = 1  # Wednesday
 X_example.at[0, 'started_at_hour_12'] = 1  # 12AM
@@ -966,12 +952,12 @@ X_example.at[0, 'ended_at_month_4'] = 1  # April
 X_example.at[0, 'ended_at_weekday_2'] = 1  # Wednesday
 X_example.at[0, 'ended_at_hour_12'] = 1  # 12AM
 
-y_pred_proba_example = model.predict_proba(X_example)[0]  # get the first (and only) row
+y_pred_proba_example = model.predict_proba(X_example)[0]  # get the first row
 
 # Map class indices back to zip codes
 predicted_zip_codes = le.inverse_transform(np.arange(len(y_pred_proba_example)))
 
-# Prepare lists (make sure to use *_example everywhere)
+# Prepare lists
 zip_codes_list = [str(z) for z in predicted_zip_codes]
 cleaned_zip_codes_list = [str(int(float(z))) for z in zip_codes_list]
 
