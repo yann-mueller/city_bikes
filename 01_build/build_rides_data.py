@@ -107,7 +107,7 @@ for ZIP_URL in ZIP_URLS:
             # Drop duplicate columns
             chunk = chunk.loc[:, ~chunk.columns.duplicated()]
 
-            # Remove any 'unnamed' columns that sneak in from CSV index, and make a fresh copy to avoid SettingWithCopyWarning
+            # Remove any 'unnamed' columns
             chunk = chunk.loc[:, ~chunk.columns.str.contains("^unnamed", case=False)].copy()
 
             # Enforce datetime conversion
@@ -137,7 +137,7 @@ for ZIP_URL in ZIP_URLS:
     del chunks
 
     # Remove temporary .csv files
-    print("🧹 Cleaning up...")
+    print("Cleaning up...")
     os.remove(ZIP_PATH)
     for item in os.listdir(DEST_DIR):
         path = os.path.join(DEST_DIR, item)
